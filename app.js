@@ -199,11 +199,13 @@ class App {
               isAuthenticated: true
             };
             this.showMainWebsiteScreen();
+            this.registerFcmPushToken();
           } else {
             this.showAuthLandingGate();
           }
         });
 
+        this.initFcmMessaging();
         this.listenToFirestoreEvents();
       } else {
         this.initLocalEngine();
@@ -836,7 +838,45 @@ class App {
     this.sendMobilePushNotification(newEvent);
   }
 
-  // --- MOBILE PUSH NOTIFICATION SYSTEM (LOGGED-IN USERS) ---
+  // --- MOBILE PUSH NOTIFICATION SYSTEM (LOGGED-IN USERS & CLOSED BROWSER FCM) ---
+  initFcmMessaging() {
+    if (window.firebase && firebase.messaging && firebase.messaging.isSupported && firebase.messaging.isSupported()) {
+      try {
+        this.messaging = firebase.messaging();
+        this.messaging.onMessage((payload) => {
+          console.log('[App] Foreground FCM notification:', payload);
+          const title = payload.notification?.title || payload.data?.title || '🔔 New Campus Listing!';
+          const shortDesc = payload.notification?.body || payload.data?.shortDesc || 'Check out the new event.';
+          this.triggerToastNotification(title, shortDesc);
+        });
+      } catch (err) {
+        console.warn("FCM Messaging init:", err);
+      }
+    }
+  }
+
+  async registerFcmPushToken() {
+    if (!this.messaging || !this.currentUser) return;
+    try {
+      const token = await this.messaging.getToken({
+        serviceWorkerRegistration: this.swRegistration
+      });
+      if (token) {
+        console.log("FCM Closed-Browser Push Token generated:", token);
+        if (this.db) {
+          await this.db.collection('fcm_tokens').doc(this.currentUser.uid).set({
+            uid: this.currentUser.uid,
+            email: this.currentUser.email,
+            token: token,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        }
+      }
+    } catch (err) {
+      console.warn("FCM Token Registration:", err);
+    }
+  }
+
   updateNotificationBellUI(isEnabled) {
     const dot = document.getElementById('bell-badge-dot');
     const bellBtn = document.getElementById('btn-notification-bell');
@@ -864,6 +904,8 @@ class App {
         this.updateNotificationBellUI(true);
         this.triggerToastNotification('🔔 Mobile Notifications Active', 'You will receive direct phone alerts when new events are published!');
         
+        this.registerFcmPushToken();
+
         // Trigger test push notification alert on phone screen
         this.sendMobilePushNotification({
           title: 'CampusPulse Mobile Alerts Enabled',
