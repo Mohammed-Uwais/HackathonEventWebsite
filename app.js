@@ -125,6 +125,18 @@ class App {
     }
 
     this.initFirebase();
+    this.initServiceWorker();
+  }
+
+  initServiceWorker() {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').then(reg => {
+        this.swRegistration = reg;
+        console.log('CampusPulse Universal PWA Service Worker registered:', reg.scope);
+      }).catch(err => {
+        console.warn('PWA Service Worker registration error:', err);
+      });
+    }
   }
 
   getDefaultFirebaseConfig() {
@@ -291,12 +303,20 @@ class App {
     this.updateUserUI();
     this.renderEvents();
 
-    // Check Notification Permission for logged-in user
-    if ('Notification' in window && Notification.permission === 'granted') {
-      this.notificationsEnabled = true;
-      this.updateNotificationBellUI(true);
-    } else {
-      this.updateNotificationBellUI(false);
+    // Check Notification Permission for logged-in user & show banner if not granted
+    if ('Notification' in window) {
+      const banner = document.getElementById('mobile-notif-banner');
+      if (Notification.permission === 'granted') {
+        this.notificationsEnabled = true;
+        this.updateNotificationBellUI(true);
+        if (banner) banner.style.display = 'none';
+      } else if (Notification.permission !== 'denied') {
+        this.updateNotificationBellUI(false);
+        if (banner) banner.style.display = 'flex';
+      } else {
+        this.updateNotificationBellUI(false);
+        if (banner) banner.style.display = 'none';
+      }
     }
   }
 
@@ -871,7 +891,8 @@ class App {
       icon: event.posterUrl ? this.sanitizeGoogleDriveUrl(event.posterUrl) : 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png',
       badge: 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png',
       vibrate: [200, 100, 200, 100, 200],
-      tag: event.id || 'event-' + Date.now()
+      tag: event.id || 'event-' + Date.now(),
+      data: { url: window.location.href }
     };
 
     try {
@@ -880,14 +901,24 @@ class App {
         navigator.vibrate([200, 100, 200, 100, 200]);
       }
 
-      const notif = new Notification(notifTitle, options);
-      notif.onclick = () => {
-        window.focus();
-        if (event.id) this.openDetailModal(event.id);
-      };
+      // Universal PWA Service Worker Notification (System Notification Shade on Vivo, Samsung, Xiaomi, iPhone)
+      if (this.swRegistration && this.swRegistration.showNotification) {
+        this.swRegistration.showNotification(notifTitle, options);
+      } else {
+        const notif = new Notification(notifTitle, options);
+        notif.onclick = () => {
+          window.focus();
+          if (event.id) this.openDetailModal(event.id);
+        };
+      }
     } catch (err) {
       console.warn("Native Notification error:", err);
     }
+  }
+
+  dismissNotifBanner() {
+    const banner = document.getElementById('mobile-notif-banner');
+    if (banner) banner.style.display = 'none';
   }
 
   // --- MULTIMODAL POSTER IMAGE UPLOAD & GROQ VISION PARSER ---

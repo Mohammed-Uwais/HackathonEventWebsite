@@ -576,6 +576,85 @@ body {
   box-shadow: 0 0 8px rgba(34, 197, 94, 0.9);
 }
 
+/* MOBILE NOTIFICATION PROMPT BANNER */
+.mobile-notif-banner {
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border-bottom: 1px solid #bfdbfe;
+  padding: 0.6rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  z-index: 35;
+}
+
+.notif-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.notif-banner-icon {
+  width: 32px;
+  height: 32px;
+  background: #2563eb;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.notif-banner-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.notif-banner-text strong {
+  font-size: 0.85rem;
+  color: #1e3a8a;
+}
+
+.notif-banner-text span {
+  font-size: 0.75rem;
+  color: #3b82f6;
+}
+
+.notif-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-banner-allow {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-banner-allow:hover {
+  background: #1d4ed8;
+}
+
+.btn-banner-dismiss {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 0.3rem;
+}
+
 .top-actions-group {
   display: flex;
   align-items: center;

@@ -147,6 +147,21 @@
     <!-- MAIN WORKSPACE CONTENT WRAPPER -->
     <main class="main-wrapper">
 
+      <!-- MOBILE NOTIFICATION PROMPT BANNER FOR LOGGED-IN USERS -->
+      <div id="mobile-notif-banner" class="mobile-notif-banner" style="display:none;">
+        <div class="notif-banner-content">
+          <div class="notif-banner-icon"><i class="fa-solid fa-bell"></i></div>
+          <div class="notif-banner-text">
+            <strong>Enable Phone Notifications 🔔</strong>
+            <span>Get direct phone screen alerts when new events or competitions are uploaded!</span>
+          </div>
+        </div>
+        <div class="notif-banner-actions">
+          <button class="btn-banner-allow" onclick="app.requestNotificationPermission()">Enable</button>
+          <button class="btn-banner-dismiss" onclick="app.dismissNotifBanner()">&times;</button>
+        </div>
+      </div>
+
       <!-- TOP BAR & ADVANCED MULTI-FILTER CONTROL PANEL -->
       <header class="top-bar">
         <div class="top-bar-header">
