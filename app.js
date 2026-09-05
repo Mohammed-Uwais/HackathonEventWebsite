@@ -1334,7 +1334,10 @@ _Published via CampusPulse_`;
   }
 
   toggleMobileSidebar() {
-    document.getElementById('sidebar').classList.toggle('mobile-open');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (sidebar) sidebar.classList.toggle('mobile-open');
+    if (overlay) overlay.classList.toggle('active');
   }
 }
 
