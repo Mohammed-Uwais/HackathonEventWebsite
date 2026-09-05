@@ -112,6 +112,7 @@ class App {
     this.publishMode = 'manual';
     this.notificationsEnabled = false;
     this.initialLoadDone = false;
+    this.inAppNotifications = JSON.parse(localStorage.getItem('campuspulse_notif_history') || '[]');
 
     const savedConfig = localStorage.getItem('campuspulse_firebase_config');
     if (savedConfig) {
@@ -130,7 +131,8 @@ class App {
 
   initServiceWorker() {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').then(reg => {
+      const swUrl = new URL('sw.js', window.location.href).href;
+      navigator.serviceWorker.register(swUrl).then(reg => {
         this.swRegistration = reg;
         console.log('CampusPulse Universal PWA Service Worker registered:', reg.scope);
       }).catch(err => {
@@ -884,6 +886,125 @@ class App {
     if (bellBtn) {
       bellBtn.title = isEnabled ? '🔔 Mobile Notifications Active' : 'Click to Enable Mobile Notifications';
     }
+    this.renderNotifDrawer();
+  }
+
+  playChimeSound() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc1.type = 'sine';
+      osc2.type = 'triangle';
+      osc1.frequency.setValueAtTime(520, ctx.currentTime);
+      osc2.frequency.setValueAtTime(660, ctx.currentTime + 0.1);
+
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start(ctx.currentTime);
+      osc2.start(ctx.currentTime + 0.1);
+      osc1.stop(ctx.currentTime + 0.5);
+      osc2.stop(ctx.currentTime + 0.5);
+    } catch (e) {
+      console.warn("Audio chime error:", e);
+    }
+  }
+
+  toggleNotifDrawer() {
+    const drawer = document.getElementById('notif-drawer');
+    if (drawer) {
+      const isActive = drawer.classList.toggle('active');
+      if (isActive) {
+        this.markNotificationsAsRead();
+      }
+    }
+  }
+
+  markNotificationsAsRead() {
+    if (!this.inAppNotifications) return;
+    this.inAppNotifications.forEach(n => n.unread = false);
+    localStorage.setItem('campuspulse_notif_history', JSON.stringify(this.inAppNotifications));
+    this.renderNotifDrawer();
+  }
+
+  renderNotifDrawer() {
+    const drawerList = document.getElementById('notif-drawer-list');
+    const badgeCount = document.getElementById('bell-badge-count');
+    if (!drawerList) return;
+
+    if (!this.inAppNotifications) this.inAppNotifications = [];
+    const unreadCount = this.inAppNotifications.filter(n => n.unread).length;
+    if (badgeCount) {
+      if (unreadCount > 0) {
+        badgeCount.textContent = unreadCount;
+        badgeCount.style.display = 'inline-block';
+      } else {
+        badgeCount.style.display = 'none';
+      }
+    }
+
+    if (this.inAppNotifications.length === 0) {
+      drawerList.innerHTML = `
+        <div style="text-align:center; padding:1.5rem; color:#94a3b8; font-size:0.8rem;">
+          <i class="fa-regular fa-bell-slash" style="font-size:1.5rem; margin-bottom:0.4rem; display:block; color:#cbd5e1;"></i>
+          No new event notifications yet.
+        </div>
+      `;
+      return;
+    }
+
+    drawerList.innerHTML = this.inAppNotifications.map(n => `
+      <div class="notif-item ${n.unread ? 'unread' : ''}" onclick="app.openNotificationItem('${this.escapeHTML(n.eventId || '')}')">
+        <div class="notif-item-icon">
+          <i class="fa-solid fa-bell"></i>
+        </div>
+        <div class="notif-item-content">
+          <div class="notif-item-title">${this.escapeHTML(n.title)}</div>
+          <div class="notif-item-desc">${this.escapeHTML(n.body)}</div>
+          <div class="notif-item-time">${n.timestamp ? new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now'}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  openNotificationItem(eventId) {
+    const drawer = document.getElementById('notif-drawer');
+    if (drawer) drawer.classList.remove('active');
+    if (eventId) {
+      this.openDetailModal(eventId);
+    }
+  }
+
+  testNotificationAlert() {
+    this.playChimeSound();
+    if (navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 200]);
+    }
+
+    const testEvent = {
+      id: 'test-' + Date.now(),
+      title: '⚡ Test Mobile Phone Alert',
+      type: 'Notification Test',
+      shortDesc: 'Mobile audio chime, vibration, & notification center test completed successfully!',
+      departments: ['All'],
+      posterUrl: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80'
+    };
+
+    this.triggerToastNotification(testEvent.title, testEvent.shortDesc);
+    this.sendMobilePushNotification(testEvent);
+
+    if ('Notification' in window && Notification.permission !== 'granted') {
+      this.requestNotificationPermission();
+    }
   }
 
   async requestNotificationPermission() {
@@ -916,7 +1037,7 @@ class App {
       } else {
         this.notificationsEnabled = false;
         this.updateNotificationBellUI(false);
-        alert('Notification permission denied. Please allow notifications in your mobile browser settings to receive alerts.');
+        alert('Notification permission denied. Please enable notifications in your mobile browser settings to receive alerts.');
       }
     } catch (err) {
       console.warn("Notification error:", err);
@@ -925,6 +1046,32 @@ class App {
 
   sendMobilePushNotification(event) {
     if (!this.currentUser || !this.currentUser.isAuthenticated) return;
+
+    // 1. Audio Sound Chime Feedback
+    this.playChimeSound();
+
+    // 2. Haptic Vibration feedback on mobile phones
+    if (navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 200]);
+    }
+
+    // 3. Store in In-App Notification Center Drawer
+    const notifObj = {
+      id: event.id || 'notif-' + Date.now(),
+      eventId: event.id || '',
+      title: event.title || 'New Campus Event',
+      body: event.shortDesc || 'Check out the latest campus listing.',
+      unread: true,
+      timestamp: new Date().toISOString()
+    };
+
+    if (!this.inAppNotifications) this.inAppNotifications = [];
+    this.inAppNotifications.unshift(notifObj);
+    if (this.inAppNotifications.length > 25) this.inAppNotifications.pop();
+    localStorage.setItem('campuspulse_notif_history', JSON.stringify(this.inAppNotifications));
+    this.renderNotifDrawer();
+
+    // 4. Send System Notification Shade Alert if OS Browser Permission Granted
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
     const notifTitle = `🔔 New ${event.type || 'Listing'}: ${event.title}`;
@@ -938,12 +1085,6 @@ class App {
     };
 
     try {
-      // Haptic Vibration feedback on mobile phones
-      if (navigator.vibrate) {
-        navigator.vibrate([200, 100, 200, 100, 200]);
-      }
-
-      // Universal PWA Service Worker Notification (System Notification Shade on Vivo, Samsung, Xiaomi, iPhone)
       if (this.swRegistration && this.swRegistration.showNotification) {
         this.swRegistration.showNotification(notifTitle, options);
       } else {
