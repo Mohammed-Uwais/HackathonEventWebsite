@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Zero-Cost Campus Event Discovery & Admin Publishing Platform with Light SaaS Aesthetic and Firebase Auth.">
+  <title>Campus Pulse | Event Discovery & Admin Publishing</title>
+  
+  <!-- TAILWIND CSS CDN FOR PRODUCTION-READY LIGHT SAAS STYLING -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <link rel="stylesheet" href="styles.css">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- OFFICIAL FIREBASE WEB SDK (COMPAT MODULES FOR CLIENT-SIDE REAL-TIME SYNC) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-[#f8fafc] text-slate-900 font-sans antialiased min-h-screen">
+
+  <!-- ==========================================================================
+       1. AUTHENTICATION & ONBOARDING MODULE (LIGHT THEME SAAS CARD)
+       ========================================================================== -->
+  <div id="auth-landing-screen" class="fixed inset-0 z-50 bg-[#f8fafc] flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white border border-[#e2e8f0] rounded-2xl shadow-xl p-8 flex flex-col gap-6">
+      
+      <!-- BRAND HEADER WITH DYNAMIC TITLES -->
+      <div class="text-center flex flex-col items-center gap-2">
+        <div class="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center text-xl font-extrabold shadow-md">
+          <i class="fa-solid fa-graduation-cap"></i>
+        </div>
+        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight" id="auth-card-title">Welcome Back</h1>
+        <p class="text-xs text-slate-500" id="auth-card-sub">Campus Event Discovery & Publishing Platform</p>
+      </div>
+
+      <!-- VIEW 1: SIGN IN FORM (WITH INLINE "INVALID USER ID" VALIDATION) -->
+      <form id="gate-view-login" onsubmit="app.handleGateSignIn(event)" class="flex flex-col gap-4">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-slate-700">Email Address <span class="text-red-500">*</span></label>
+          <input type="email" id="gate-login-email" class="w-full px-3.5 py-2.5 bg-white border border-[#e2e8f0] rounded-lg text-sm text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition" placeholder="student@campus.edu" required>
+          
+          <!-- DYNAMIC ERROR MSG DIRECTLY BELOW EMAIL INPUT -->
+          <div id="login-email-error" class="hidden text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+            <i class="fa-solid fa-circle-exclamation"></i> Invalid user ID. Please check your email or sign up.
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-slate-700">Password <span class="text-red-500">*</span></label>
+          <input type="password" id="gate-login-password" class="w-full px-3.5 py-2.5 bg-white border border-[#e2e8f0] rounded-lg text-sm text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition" placeholder="••••••••" required>
+        </div>
+
+        <div class="flex justify-between items-center text-xs">
+          <a href="#" class="text-blue-600 font-medium hover:underline" onclick="event.preventDefault(); app.handleDirectPasswordReset()">Forgot Password?</a>
+        </div>
+
+        <button type="submit" id="btn-gate-signin" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-right-to-bracket"></i> Sign In
+        </button>
+
+        <!-- TOGGLE TO SIGN UP -->
+        <div class="text-center text-xs text-slate-500 mt-2">
+          Don't have an account? <a href="#" class="text-blue-600 font-bold hover:underline" onclick="app.switchGateTab('signup')">Sign Up</a>
+        </div>
+      </form>
+
+      <!-- VIEW 2: SIGN UP FORM (EMAIL & PASSWORD ONLY) -->
+      <form id="gate-view-signup" onsubmit="app.handleGateSignUp(event)" class="hidden flex flex-col gap-4">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-slate-700">Email Address <span class="text-red-500">*</span></label>
+          <input type="email" id="gate-signup-email" class="w-full px-3.5 py-2.5 bg-white border border-[#e2e8f0] rounded-lg text-sm text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition" placeholder="organizer@campus.edu" required>
+          <div id="signup-email-error" class="hidden text-xs text-red-600 mt-1 font-semibold flex items-center gap-1"></div>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-slate-700">Password <span class="text-red-500">*</span></label>
+          <input type="password" id="gate-signup-password" class="w-full px-3.5 py-2.5 bg-white border border-[#e2e8f0] rounded-lg text-sm text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition" placeholder="••••••••" required minlength="6">
+        </div>
+
+        <button type="submit" id="btn-gate-signup" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-user-plus"></i> Create Account
+        </button>
+
+        <!-- TOGGLE TO SIGN IN -->
+        <div class="text-center text-xs text-slate-500 mt-2">
+          Already have an account? <a href="#" class="text-blue-600 font-bold hover:underline" onclick="app.switchGateTab('login')">Sign In</a>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+
+  <!-- ==========================================================================
+       2. MAIN WEBSITE APPLICATION DASHBOARD (REVEALED UPON SUCCESSFUL AUTH)
+       ========================================================================== -->
+  <div id="app-container">
+
+    <!-- FIXED DARK NAVY SIDEBAR (#0f172a) -->
+    <aside class="sidebar" id="sidebar">
+      <div>
+        <div class="sidebar-header">
+          <div class="sidebar-logo-icon">
+            <i class="fa-solid fa-graduation-cap"></i>
+          </div>
+          <div>
+            <div class="sidebar-title">CampusPulse</div>
+            <div class="sidebar-subtitle">Enterprise Event Hub</div>
+          </div>
+        </div>
+
+        <div class="nav-section-label">Platform Tools</div>
+        <div class="sidebar-actions-group">
+          <!-- PUBLISH EVENT BUTTON -->
+          <button class="btn-sidebar-publish" id="btn-sidebar-publish" onclick="app.openPublishModal()">
+            <i class="fa-solid fa-plus-circle"></i> Publish Event
+          </button>
+
+          <!-- AI ASSISTANT BUTTON -->
+          <button class="btn-sidebar-ai" onclick="app.openAiChat()">
+            <i class="fa-solid fa-robot"></i> AI Assistant
+          </button>
+        </div>
+      </div>
+
+      <!-- SIDEBAR FOOTER: USER PROFILE BADGE & LOGOUT BUTTON -->
+      <div class="sidebar-footer">
+        <div class="user-profile-badge" id="user-profile-badge">
+          <div class="avatar-circle" id="user-avatar-initials">AD</div>
+          <div class="user-info">
+            <div class="user-email" id="display-user-email">admin@campus.edu</div>
+            <div class="user-role-badge" id="display-user-role">Campus User</div>
+          </div>
+        </div>
+
+        <button class="btn-logout" id="btn-logout" onclick="app.logoutUser()">
+          <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN WORKSPACE CONTENT WRAPPER -->
+    <main class="main-wrapper">
+
+      <!-- TOP BAR & ADVANCED MULTI-FILTER CONTROL PANEL -->
+      <header class="top-bar">
+        <div class="top-bar-header">
+          <button class="mobile-nav-toggle" onclick="app.toggleMobileSidebar()">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <div class="top-bar-title-group">
+            <h1 id="page-directory-title">Campus Events & Competitions Hub</h1>
+            <p id="page-directory-sub">Discover upcoming hackathons, symposia, and workshops</p>
+          </div>
+          
+          <!-- DUAL DIRECTORY TAB SWITCHER -->
+          <div class="directory-switcher-bar">
+            <button class="directory-tab-btn active" id="tab-dir-events" onclick="app.switchDirectory('events')">
+              <i class="fa-solid fa-trophy"></i> <span>1. Events & Competitions</span>
+            </button>
+            <button class="directory-tab-btn" id="tab-dir-projects" onclick="app.switchDirectory('projects')">
+              <i class="fa-solid fa-lightbulb"></i> <span>2. Projects & Innovations</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SEARCH & ADVANCED MULTI-FILTER CONTROL PANEL -->
+        <div class="filter-control-panel">
+          <div class="search-input-wrapper">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input type="text" id="search-input" class="input-control" placeholder="Search events or projects by title, tech stack, department..." oninput="app.handleFilterChange()">
+          </div>
+
+          <div>
+            <select id="dept-select" class="select-control" onchange="app.handleFilterChange()">
+              <option value="">All Departments</option>
+              <option value="CSE">CSE</option>
+              <option value="ECE">ECE</option>
+              <option value="IT">IT</option>
+              <option value="AIDS">AIDS</option>
+              <option value="EEE">EEE</option>
+              <option value="MECH">MECH</option>
+            </select>
+          </div>
+
+          <div id="status-select-container">
+            <select id="status-select" class="select-control" onchange="app.handleFilterChange()">
+              <option value="">All Statuses</option>
+              <option value="OPEN">🟢 Registration Open</option>
+              <option value="CLOSED">🟡 Reg Closed (Pending)</option>
+              <option value="ENDED">🔴 Event Ended</option>
+            </select>
+          </div>
+
+          <div class="date-range-group" id="date-filter-group">
+            <div style="flex:1;">
+              <input type="date" id="date-single" class="date-control" title="Single Date Filter" onchange="app.handleFilterChange()">
+            </div>
+            <label>Range:</label>
+            <div style="flex:1;">
+              <input type="date" id="date-from" class="date-control" title="From Date" onchange="app.handleFilterChange()">
+            </div>
+            <div style="flex:1;">
+              <input type="date" id="date-to" class="date-control" title="To Date" onchange="app.handleFilterChange()">
+            </div>
+          </div>
+
+          <button class="btn-reset-filters" onclick="app.resetFilters()">
+            <i class="fa-solid fa-rotate-left"></i> Reset
+          </button>
+        </div>
+
+        <!-- DEPARTMENT CHIPS QUICK BAR -->
+        <div class="dept-chips-container" id="dept-chips">
+          <button class="dept-chip active" data-dept="" onclick="app.setDeptFilter('')">All</button>
+          <button class="dept-chip" data-dept="CSE" onclick="app.setDeptFilter('CSE')">CSE</button>
+          <button class="dept-chip" data-dept="ECE" onclick="app.setDeptFilter('ECE')">ECE</button>
+          <button class="dept-chip" data-dept="IT" onclick="app.setDeptFilter('IT')">IT</button>
+          <button class="dept-chip" data-dept="AIDS" onclick="app.setDeptFilter('AIDS')">AIDS</button>
+          <button class="dept-chip" data-dept="EEE" onclick="app.setDeptFilter('EEE')">EEE</button>
+          <button class="dept-chip" data-dept="MECH" onclick="app.setDeptFilter('MECH')">MECH</button>
+        </div>
+      </header>
+
+      <!-- CONTENT CANVAS & EVENTS/PROJECTS GRID -->
+      <section class="content-canvas">
+        <div class="status-legend-bar" id="legend-bar">
+          <div class="legend-items" id="legend-items-container">
+            <div class="legend-item">
+              <span class="legend-dot green"></span> 🟢 Reg Open
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot yellow"></span> 🟡 Reg Closed
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot red"></span> 🔴 Event Ended
+            </div>
+          </div>
+          <div class="results-count" id="results-count">Showing 0 listings</div>
+        </div>
+
+        <div class="events-grid" id="events-grid">
+          <!-- Dynamically populated event or project cards -->
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- REAL-TIME TOAST NOTIFICATIONS WRAPPER -->
+  <div id="toast-container"></div>
+
+  <!-- FLOATING AI CONCIERGE CHATBOT WIDGET -->
+  <button class="chatbot-fab" id="chatbot-fab" onclick="app.toggleAiChat()" title="Ask AI Concierge">
+    <i class="fa-solid fa-robot"></i>
+  </button>
+
+  <div class="chatbot-window" id="chatbot-window">
+    <div class="chatbot-header">
+      <div class="chatbot-header-info">
+        <div class="chatbot-status-dot"></div>
+        <div>
+          <strong style="font-size: 0.95rem;">Campus AI Concierge</strong>
+          <div style="font-size: 0.725rem; color: #94a3b8;">Powered by Groq AI</div>
+        </div>
+      </div>
+      <button class="btn-close-modal" style="color:#fff;" onclick="app.toggleAiChat()">&times;</button>
+    </div>
+    <div class="chatbot-messages" id="chat-messages">
+      <div class="chat-bubble bot">
+        👋 Hi! I'm your AI Campus Concierge. Ask me anything about upcoming events, hackathons, or LICET student projects and research papers!
+      </div>
+    </div>
+    <form class="chatbot-input-area" onsubmit="app.handleChatSubmit(event)">
+      <input type="text" id="chat-input" placeholder="Ask about events or student projects..." autocomplete="off">
+      <button type="submit"><i class="fa-solid fa-paper-plane"></i></button>
+    </form>
+  </div>
+
+  <!-- MODAL 1: ADMIN PUBLISHING STUDIO -->
+  <div class="modal-overlay" id="publish-modal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h2 id="modal-publish-title">Admin Publishing Studio</h2>
+        <button class="btn-close-modal" onclick="app.closeModal('publish-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+
+        <div class="publish-mode-tabs">
+          <button class="publish-tab-btn active" id="tab-btn-manual" onclick="app.switchPublishTab('manual')">
+            <i class="fa-solid fa-pen-to-square"></i> Mode 1: Manual Form
+          </button>
+          <button class="publish-tab-btn" id="tab-btn-ai" onclick="app.switchPublishTab('ai')">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Mode 2: AI Parser (Groq)
+          </button>
+        </div>
+
+        <div id="publish-view-manual">
+          <form onsubmit="app.handleManualPublish(event)" style="display:flex; flex-direction:column; gap:1.1rem;">
+            
+            <div class="form-group" style="background:#f1f5f9; padding:0.75rem; border-radius:0.5rem; border:1px solid #cbd5e1;">
+              <label class="form-label" style="font-weight:700; color:#0f172a;">Directory Target <span class="required">*</span></label>
+              <select id="pub-directory" class="select-control" style="background:#ffffff; font-weight:600;" onchange="app.handlePublishDirectoryChange(this.value)" required>
+                <option value="events">🏆 Directory 1: Campus Event / Competition</option>
+                <option value="projects">💡 Directory 2: Student Project / Research Paper / Innovation</option>
+              </select>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" id="lbl-pub-title">Listing Title <span class="required">*</span></label>
+                <input type="text" id="pub-title" class="input-control" style="padding-left:0.85rem;" placeholder="e.g. AI Innovations Hackathon 2026" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" id="lbl-pub-type">Category / Type <span class="required">*</span></label>
+                <select id="pub-type" class="select-control" required>
+                  <option value="Symposium">Symposium</option>
+                  <option value="Hackathon">Hackathon</option>
+                  <option value="Quiz">Quiz Competition</option>
+                  <option value="Workshop">Hands-on Workshop</option>
+                  <option value="Seminar">Guest Seminar</option>
+                  <option value="Project">Student Project / Prototype</option>
+                  <option value="Research">Research Paper</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group" id="group-tech-stack" style="display:none;">
+              <label class="form-label">Technologies / Tech Stack (Comma separated)</label>
+              <input type="text" id="pub-tech-stack" class="input-control" style="padding-left:0.85rem;" placeholder="e.g. Python, TensorFlow, React, IoT, C++">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Short Summary (For card feed) <span class="required">*</span></label>
+              <input type="text" id="pub-short-desc" class="input-control" style="padding-left:0.85rem;" placeholder="Brief overview of the event or project..." required maxlength="150">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" id="lbl-pub-full-desc">Full Description / Abstract <span class="required">*</span></label>
+              <textarea id="pub-full-desc" class="input-control" style="padding-left:0.85rem; height:80px;" placeholder="Detailed breakdown of rules, problem statements, or project methodology..." required></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Department Eligibility / Origin <span class="required">*</span></label>
+              <div class="checkbox-group">
+                <label class="checkbox-label"><input type="checkbox" name="pub-dept" value="All" onchange="app.toggleAllDepts(this)"> All Depts</label>
+                <label class="checkbox-label"><input type="checkbox" name="pub-dept" value="CSE"> CSE</label>
+                <label class="checkbox-label"><input type="checkbox" name="pub-dept" value="ECE"> ECE</label>
+                <label class="checkbox-label"><input type="checkbox" name="pub-dept" value="IT"> IT</label>
+                <label class="checkbox-label"><input type="checkbox" name="pub-dept" value="AIDS"> AIDS</label>
+                <label class="checkbox-label"><input type="checkbox" name="pub-dept" value="EEE"> EEE</label>
+                <label class="checkbox-label"><input type="checkbox" name="pub-dept" value="MECH"> MECH</label>
+              </div>
+            </div>
+
+            <div class="form-group" id="group-pub-rules">
+              <label class="form-label" id="lbl-pub-rules">Criteria & Guidelines</label>
+              <textarea id="pub-rules" class="input-control" style="padding-left:0.85rem; height:60px;" placeholder="1. Teams of up to 4. 2. College ID mandatory."></textarea>
+            </div>
+
+            <div class="form-row" id="group-pub-reg-dates">
+              <div class="form-group">
+                <label class="form-label">Registration Start <span class="required">*</span></label>
+                <input type="datetime-local" id="pub-reg-start" class="date-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Registration End <span class="required">*</span></label>
+                <input type="datetime-local" id="pub-reg-end" class="date-control">
+              </div>
+            </div>
+
+            <div class="form-row" id="group-pub-event-dates">
+              <div class="form-group">
+                <label class="form-label">Event Start <span class="required">*</span></label>
+                <input type="datetime-local" id="pub-event-start" class="date-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Event End <span class="required">*</span></label>
+                <input type="datetime-local" id="pub-event-end" class="date-control">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" id="lbl-pub-reg-link">Registration / GitHub Link <span class="required">*</span></label>
+                <input type="url" id="pub-reg-link" class="input-control" style="padding-left:0.85rem;" placeholder="https://forms.google.com/... or https://github.com/..." required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Poster / Screenshot URL <span class="required">*</span></label>
+                <input type="url" id="pub-poster-url" class="input-control" style="padding-left:0.85rem;" placeholder="https://drive.google.com/file/d/.../view or image URL" required>
+                <small style="font-size:0.75rem; color:#0284c7;">✨ Google Drive share links are converted to direct high-res embeds!</small>
+              </div>
+            </div>
+
+            <button type="submit" class="btn-primary" style="margin-top:0.5rem;" id="btn-pub-submit">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Publish Listing to Directory
+            </button>
+          </form>
+        </div>
+
+        <div id="publish-view-ai" style="display:none;">
+          <div class="ai-prompt-box">
+            <h4 style="color:#0369a1; margin-bottom:0.4rem; display:flex; align-items:center; gap:0.4rem;">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> Multimodal AI Smart Publisher (Text & Poster OCR)
+            </h4>
+            <p style="font-size:0.825rem; color:#0c4a6e; margin-bottom:0.85rem;">
+              Paste raw text circulars <strong>AND/OR</strong> upload an event poster/flyer image below. Groq Vision AI will read and extract structured fields automatically!
+            </p>
+            
+            <!-- INPUT 1: RAW TEXT ANNOUNCEMENT -->
+            <div style="margin-bottom:1rem;">
+              <label class="form-label" style="font-size:0.8rem; font-weight:700; color:#0369a1; margin-bottom:0.25rem; display:block;">
+                <i class="fa-solid fa-align-left"></i> 1. Text Announcement / Email (Optional if uploading poster)
+              </label>
+              <textarea id="ai-raw-prompt" class="input-control" style="padding-left:0.85rem; height:80px;" placeholder="Paste WhatsApp circular, email, or announcement text here..."></textarea>
+            </div>
+
+            <!-- INPUT 2: POSTER IMAGE UPLOAD DROPZONE -->
+            <div>
+              <label class="form-label" style="font-size:0.8rem; font-weight:700; color:#0369a1; margin-bottom:0.25rem; display:block;">
+                <i class="fa-solid fa-file-image"></i> 2. Upload Event Poster / Flyer Image (Optional if pasting text)
+              </label>
+              <div class="poster-dropzone" id="poster-dropzone" onclick="document.getElementById('ai-poster-input').click()">
+                <input type="file" id="ai-poster-input" accept="image/*" style="display:none;" onchange="app.handlePosterUpload(event)">
+                <div id="dropzone-empty-state" style="text-align:center; padding:1.2rem 1rem;">
+                  <i class="fa-solid fa-cloud-arrow-up" style="font-size:2rem; color:#0284c7; margin-bottom:0.3rem;"></i>
+                  <div style="font-size:0.875rem; font-weight:700; color:#0f172a;">Click or Drag & Drop Event Poster Image</div>
+                  <div style="font-size:0.75rem; color:#64748b; margin-top:0.2rem;">Supports PNG, JPG, WEBP, or PDF flyer screenshots</div>
+                </div>
+                <div id="dropzone-preview-state" style="display:none; align-items:center; justify-content:space-between; gap:1rem; padding:0.75rem 1rem; width:100%;">
+                  <div style="display:flex; align-items:center; gap:0.8rem; overflow:hidden;">
+                    <img id="ai-poster-preview-img" src="" alt="Poster Preview" style="height:60px; width:60px; object-fit:cover; border-radius:0.375rem; border:1px solid #cbd5e1; flex-shrink:0;">
+                    <div style="overflow:hidden;">
+                      <div id="ai-poster-filename" style="font-size:0.85rem; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">poster.png</div>
+                      <div style="font-size:0.75rem; color:#16a34a; font-weight:600;"><i class="fa-solid fa-circle-check"></i> Ready for Groq Vision OCR</div>
+                    </div>
+                  </div>
+                  <button type="button" class="btn-reset-filters" style="padding:0.4rem 0.65rem; font-size:0.75rem; flex-shrink:0;" onclick="event.stopPropagation(); app.clearPosterUpload();">
+                    <i class="fa-solid fa-trash-can"></i> Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <button type="button" class="btn-primary" style="margin-top:1.1rem; width:100%; font-size:0.95rem; padding:0.85rem; background:linear-gradient(135deg, #0284c7, #2563eb);" onclick="app.parseMultimodalWithGroq()">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> Extract & Pre-Fill Fields with Groq Vision AI
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: DETAILED STUDENT EVENT MODAL -->
+  <div class="modal-overlay" id="detail-modal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h2 id="modal-detail-title">Event Title</h2>
+        <button class="btn-close-modal" onclick="app.closeModal('detail-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        
+        <div class="detail-poster-container">
+          <img id="modal-detail-poster" src="" alt="Event Poster">
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+          <span class="card-status-badge open" id="modal-detail-status">🟢 Registration Open</span>
+          <span style="font-size:0.8rem; color:var(--text-muted);" id="modal-detail-organizer">Published by: organizer@campus.edu</span>
+        </div>
+
+        <div>
+          <h4 style="font-size:0.9rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.25rem;">Description</h4>
+          <p id="modal-detail-full-desc" style="font-size:0.95rem; color:var(--text-main); line-height:1.6;"></p>
+        </div>
+
+        <div class="form-row">
+          <div>
+            <h4 style="font-size:0.85rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.25rem;">Timeline</h4>
+            <div style="font-size:0.85rem; color:var(--text-main); display:flex; flex-direction:column; gap:0.2rem;">
+              <div>🗓 <strong>Reg Period:</strong> <span id="modal-detail-reg-time"></span></div>
+              <div>⚡ <strong>Event Timing:</strong> <span id="modal-detail-event-time"></span></div>
+            </div>
+          </div>
+          <div>
+            <h4 style="font-size:0.85rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.25rem;">Department Eligibility</h4>
+            <div class="card-dept-tags" id="modal-detail-depts"></div>
+          </div>
+        </div>
+
+        <div>
+          <h4 style="font-size:0.85rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.25rem;">Rules & Criteria</h4>
+          <p id="modal-detail-rules" style="font-size:0.875rem; color:var(--text-main); background:#f8fafc; padding:0.75rem; border-radius:var(--radius-sm); border:1px solid var(--border-light);"></p>
+        </div>
+
+        <div class="detail-actions-bar">
+          <button class="btn-action-ai" onclick="app.copyAiReminderText()">
+            <i class="fa-solid fa-copy"></i> Copy AI Reminder Text
+          </button>
+          <button class="btn-action-cal" onclick="app.addToGoogleCalendar()">
+            <i class="fa-regular fa-calendar-plus"></i> Add to Google Calendar
+          </button>
+          <a href="#" id="modal-detail-reg-btn" target="_blank" class="btn-action-reg">
+            <i class="fa-solid fa-paper-plane"></i> Register Now
+          </a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: PASSWORD RESET MODAL (OPTION A: FIREBASE EMAIL LINK) -->
+  <div class="modal-overlay" id="otp-modal">
+    <div class="modal-container" style="max-width: 440px;">
+      <div class="modal-header">
+        <h2>Password Reset</h2>
+        <button class="btn-close-modal" onclick="app.closeModal('otp-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        
+        <!-- STEP 1: ENTER REGISTERED EMAIL -->
+        <div id="otp-modal-step-1">
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+            Enter your registered Gmail address below. We will send an official password reset link directly to your email inbox.
+          </p>
+          <form onsubmit="app.handleSendOtpModal(event)" style="display:flex; flex-direction:column; gap:1rem;">
+            <div class="form-group">
+              <label class="form-label">Registered Gmail Address <span class="required">*</span></label>
+              <input type="email" id="otp-modal-email" class="input-control" style="padding-left:0.85rem;" placeholder="your.name@gmail.com" required>
+            </div>
+            <button type="submit" class="btn-primary" style="width:100%;">
+              <i class="fa-solid fa-paper-plane"></i> Send Password Reset Link
+            </button>
+          </form>
+        </div>
+
+        <!-- STEP 2: EMAIL DISPATCHED CONFIRMATION -->
+        <div id="otp-modal-step-2" style="display:none; text-align:center; padding:0.5rem 0;">
+          <div style="width:56px; height:56px; background:#ecfdf5; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 1rem auto; color:#10b981; font-size:1.5rem;">
+            <i class="fa-solid fa-envelope-circle-check"></i>
+          </div>
+          <h3 style="font-size:1.1rem; font-weight:700; color:#0f172a; margin-bottom:0.5rem;">Check Your Inbox</h3>
+          <p style="font-size:0.875rem; color:#64748b; margin-bottom:1.5rem; line-height:1.5;">
+            A password reset link has been dispatched to <strong id="reset-target-email" style="color:#0f172a;">your email</strong>. Please check your inbox (and Spam folder), click the link, and reset your password.
+          </p>
+          <button type="button" class="btn-primary" style="width:100%;" onclick="app.closeModal('otp-modal'); app.switchGateTab('login');">
+            <i class="fa-solid fa-arrow-left"></i> Back to Sign In
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="env.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
