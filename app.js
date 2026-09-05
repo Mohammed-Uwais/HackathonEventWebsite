@@ -130,6 +130,12 @@ class App {
   }
 
   initServiceWorker() {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      this.deferredPwaPrompt = e;
+      console.log("PWA beforeinstallprompt captured.");
+    });
+
     if ('serviceWorker' in navigator) {
       const swUrl = new URL('sw.js', window.location.href).href;
       navigator.serviceWorker.register(swUrl).then(reg => {
@@ -1102,6 +1108,21 @@ class App {
   dismissNotifBanner() {
     const banner = document.getElementById('mobile-notif-banner');
     if (banner) banner.style.display = 'none';
+  }
+
+  async promptPwaInstall() {
+    if (this.deferredPwaPrompt) {
+      this.deferredPwaPrompt.prompt();
+      const choice = await this.deferredPwaPrompt.userChoice;
+      console.log('PWA installation choice:', choice);
+      this.deferredPwaPrompt = null;
+    } else {
+      this.showPwaGuideModal();
+    }
+  }
+
+  showPwaGuideModal() {
+    this.openModal('pwa-guide-modal');
   }
 
   // --- MULTIMODAL POSTER IMAGE UPLOAD & GROQ VISION PARSER ---

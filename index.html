@@ -177,7 +177,11 @@
           </button>
 
           <!-- MOBILE PUSH NOTIFICATION BELL BUTTON & DRAWER -->
-          <div style="position:relative;">
+          <div style="display:flex; align-items:center; gap:0.5rem; position:relative;">
+            <button class="btn-notification-bell" id="btn-pwa-install" onclick="app.promptPwaInstall()" style="background:#eff6ff; border-color:#93c5fd; color:#1d4ed8; font-weight:700;" title="Install Mobile App for Closed-Browser Notifications">
+              <i class="fa-solid fa-download"></i> <span style="font-size:0.8rem; margin-left:0.25rem;" class="hidden sm:inline">Install App</span>
+            </button>
+
             <button class="btn-notification-bell" id="btn-notification-bell" onclick="app.toggleNotifDrawer()" title="View Event Alerts & Device Notifications">
               <i class="fa-solid fa-bell"></i>
               <span class="bell-badge-dot" id="bell-badge-dot"></span>
@@ -199,9 +203,12 @@
                   No new event notifications yet.
                 </div>
               </div>
-              <div class="notif-drawer-footer">
+              <div class="notif-drawer-footer" style="display:flex; flex-direction:column; gap:0.4rem;">
                 <button class="btn-banner-allow" style="width:100%; text-align:center;" onclick="app.testNotificationAlert()">
                   <i class="fa-solid fa-mobile-screen-button"></i> Test Phone Sound & Device Alert
+                </button>
+                <button class="btn-secondary" style="width:100%; text-align:center; padding:0.4rem; font-size:0.75rem;" onclick="app.showPwaGuideModal()">
+                  <i class="fa-solid fa-circle-info"></i> Mobile Phone Guide (Vivo, Samsung, iPhone)
                 </button>
               </div>
             </div>
@@ -605,6 +612,70 @@
           </p>
           <button type="button" class="btn-primary" style="width:100%;" onclick="app.closeModal('otp-modal'); app.switchGateTab('login');">
             <i class="fa-solid fa-arrow-left"></i> Back to Sign In
+          </button>
+        </div>
+
+  <!-- MODAL 4: PWA MOBILE PHONE INSTALL & NOTIFICATION GUIDE MODAL -->
+  <div class="modal-overlay" id="pwa-guide-modal">
+    <div class="modal-container" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2 style="display:flex; align-items:center; gap:0.5rem; font-size:1.1rem; color:#0f172a;">
+          <i class="fa-solid fa-mobile-screen" style="color:#2563eb;"></i> Mobile Setup & Closed-Browser Alerts
+        </h2>
+        <button class="btn-close-modal" onclick="app.closeModal('pwa-guide-modal')">&times;</button>
+      </div>
+      <div class="modal-body" style="gap:1rem;">
+        
+        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:0.5rem; padding:0.85rem;">
+          <strong style="display:block; font-size:0.875rem; color:#1e40af; margin-bottom:0.2rem;">
+            📱 How to install CampusPulse on your Phone:
+          </strong>
+          <span style="font-size:0.8rem; color:#3b82f6; line-height:1.4;">
+            Installing the app puts CampusPulse on your home screen so notifications work even when your browser is closed!
+          </span>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:0.85rem; font-size:0.85rem; color:#334155;">
+          
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:0.5rem; padding:0.75rem;">
+            <strong style="color:#0f172a; display:block; margin-bottom:0.25rem;">
+              <i class="fa-brands fa-chrome" style="color:#ea4335;"></i> Google Chrome (Android / Vivo / Samsung)
+            </strong>
+            <ol style="margin-left:1.2rem; line-height:1.5; font-size:0.8rem;">
+              <li>Tap the <strong>3 dots menu (<i class="fa-solid fa-ellipsis-vertical"></i>)</strong> at top right of Chrome.</li>
+              <li>Tap <strong>"Add to Home screen"</strong> or <strong>"Install App"</strong>.</li>
+              <li>Tap <strong>Install</strong>. CampusPulse is now an app on your phone screen!</li>
+            </ol>
+          </div>
+
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:0.5rem; padding:0.75rem;">
+            <strong style="color:#0f172a; display:block; margin-bottom:0.25rem;">
+              <i class="fa-solid fa-compass" style="color:#0284c7;"></i> Vivo / Xiaomi / Samsung Default Browser
+            </strong>
+            <ol style="margin-left:1.2rem; line-height:1.5; font-size:0.8rem;">
+              <li>Tap the <strong>Menu icon (<i class="fa-solid fa-bars"></i> or 3 dots)</strong> at bottom or top right.</li>
+              <li>Tap <strong>"Add to Desktop"</strong> / <strong>"Add Shortcut"</strong> / <strong>"Add to Home"</strong>.</li>
+            </ol>
+          </div>
+
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:0.5rem; padding:0.75rem;">
+            <strong style="color:#0f172a; display:block; margin-bottom:0.25rem;">
+              <i class="fa-brands fa-apple" style="color:#475569;"></i> iPhone (Safari)
+            </strong>
+            <ol style="margin-left:1.2rem; line-height:1.5; font-size:0.8rem;">
+              <li>Tap the <strong>Share Icon (<i class="fa-solid fa-arrow-up-from-bracket"></i>)</strong> at bottom of Safari.</li>
+              <li>Scroll down and tap <strong>"Add to Home Screen"</strong>.</li>
+            </ol>
+          </div>
+
+        </div>
+
+        <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+          <button type="button" class="btn-primary" style="flex:1;" onclick="app.promptPwaInstall(); app.closeModal('pwa-guide-modal');">
+            <i class="fa-solid fa-download"></i> Try 1-Tap Install Now
+          </button>
+          <button type="button" class="btn-secondary" onclick="app.closeModal('pwa-guide-modal')">
+            Close
           </button>
         </div>
 
