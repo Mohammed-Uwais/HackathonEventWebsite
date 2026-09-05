@@ -110,6 +110,8 @@ class App {
     this.selectedEventId = null;
     this.otpState = { email: '', code: '' };
     this.publishMode = 'manual';
+    this.notificationsEnabled = false;
+    this.initialLoadDone = false;
 
     const savedConfig = localStorage.getItem('campuspulse_firebase_config');
     if (savedConfig) {
@@ -239,12 +241,23 @@ class App {
         return;
       }
 
+      // Check if new listings were published after initial load
+      if (this.initialLoadDone && snapshot.docChanges) {
+        snapshot.docChanges().forEach(change => {
+          if (change.type === 'added') {
+            const newDoc = { id: change.doc.id, ...change.doc.data() };
+            this.sendMobilePushNotification(newDoc);
+          }
+        });
+      }
+
       const docs = [];
       snapshot.forEach(doc => {
         docs.push({ id: doc.id, ...doc.data() });
       });
 
       this.events = docs;
+      this.initialLoadDone = true;
       this.saveEventsToStorage();
       this.renderEvents();
     }, (error) => {
@@ -277,6 +290,14 @@ class App {
 
     this.updateUserUI();
     this.renderEvents();
+
+    // Check Notification Permission for logged-in user
+    if ('Notification' in window && Notification.permission === 'granted') {
+      this.notificationsEnabled = true;
+      this.updateNotificationBellUI(true);
+    } else {
+      this.updateNotificationBellUI(false);
+    }
   }
 
   switchGateTab(mode) {
@@ -792,6 +813,81 @@ class App {
       directory === 'projects' ? '💡 New Project / Paper Published!' : '🎉 New Event Published!',
       `${this.escapeHTML(newEvent.title)} added to Directory.`
     );
+    this.sendMobilePushNotification(newEvent);
+  }
+
+  // --- MOBILE PUSH NOTIFICATION SYSTEM (LOGGED-IN USERS) ---
+  updateNotificationBellUI(isEnabled) {
+    const dot = document.getElementById('bell-badge-dot');
+    const bellBtn = document.getElementById('btn-notification-bell');
+    if (dot) dot.classList.toggle('active', isEnabled);
+    if (bellBtn) {
+      bellBtn.title = isEnabled ? '🔔 Mobile Notifications Active' : 'Click to Enable Mobile Notifications';
+    }
+  }
+
+  async requestNotificationPermission() {
+    if (!this.currentUser || !this.currentUser.isAuthenticated) {
+      alert('Please log in first to enable mobile notifications.');
+      return;
+    }
+
+    if (!('Notification' in window)) {
+      alert('Web Notifications are not supported in your browser.');
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        this.notificationsEnabled = true;
+        this.updateNotificationBellUI(true);
+        this.triggerToastNotification('🔔 Mobile Notifications Active', 'You will receive direct phone alerts when new events are published!');
+        
+        // Trigger test push notification alert on phone screen
+        this.sendMobilePushNotification({
+          title: 'CampusPulse Mobile Alerts Enabled',
+          type: 'Notification',
+          shortDesc: 'You will receive direct alerts on your phone screen whenever new events or projects are posted!',
+          departments: ['All']
+        });
+      } else {
+        this.notificationsEnabled = false;
+        this.updateNotificationBellUI(false);
+        alert('Notification permission denied. Please allow notifications in your mobile browser settings to receive alerts.');
+      }
+    } catch (err) {
+      console.warn("Notification error:", err);
+    }
+  }
+
+  sendMobilePushNotification(event) {
+    if (!this.currentUser || !this.currentUser.isAuthenticated) return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    const notifTitle = `🔔 New ${event.type || 'Listing'}: ${event.title}`;
+    const options = {
+      body: `${event.departments ? event.departments.join(', ') + ' | ' : ''}${event.shortDesc || 'Check out the new campus listing!'}`,
+      icon: event.posterUrl ? this.sanitizeGoogleDriveUrl(event.posterUrl) : 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png',
+      badge: 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png',
+      vibrate: [200, 100, 200, 100, 200],
+      tag: event.id || 'event-' + Date.now()
+    };
+
+    try {
+      // Haptic Vibration feedback on mobile phones
+      if (navigator.vibrate) {
+        navigator.vibrate([200, 100, 200, 100, 200]);
+      }
+
+      const notif = new Notification(notifTitle, options);
+      notif.onclick = () => {
+        window.focus();
+        if (event.id) this.openDetailModal(event.id);
+      };
+    } catch (err) {
+      console.warn("Native Notification error:", err);
+    }
   }
 
   // --- MULTIMODAL POSTER IMAGE UPLOAD & GROQ VISION PARSER ---

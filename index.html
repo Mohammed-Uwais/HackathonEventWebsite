@@ -153,6 +153,12 @@
           <button class="mobile-nav-toggle" onclick="app.toggleMobileSidebar()">
             <i class="fa-solid fa-bars"></i>
           </button>
+
+          <!-- MOBILE PUSH NOTIFICATION BELL BUTTON -->
+          <button class="btn-notification-bell" id="btn-notification-bell" onclick="app.requestNotificationPermission()" title="Enable Mobile Phone Screen Notifications">
+            <i class="fa-solid fa-bell"></i>
+            <span class="bell-badge-dot" id="bell-badge-dot"></span>
+          </button>
           <div class="top-bar-title-group">
             <h1 id="page-directory-title">Campus Events & Competitions Hub</h1>
             <p id="page-directory-sub">Discover upcoming hackathons, symposia, and workshops</p>
