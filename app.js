@@ -1499,7 +1499,7 @@ Sent automatically via CampusPulse Enterprise Hub from ${senderEmail} to registe
         body: JSON.stringify({
           service_id: window.ENV?.EMAILJS_SERVICE_ID || 'service_x2wgfce',
           template_id: window.ENV?.EMAILJS_TEMPLATE_ID || 'template_event',
-          user_id: window.ENV?.EMAILJS_PUBLIC_KEY || 'public_key_campuspulse',
+          user_id: window.ENV?.EMAILJS_PUBLIC_KEY || 'zo8_pyGWh7nYIpmQZ',
           template_params: {
             to_email: targetEmail,
             from_email: senderEmail,
