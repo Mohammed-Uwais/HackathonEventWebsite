@@ -1497,12 +1497,12 @@ Sent automatically via CampusPulse Enterprise Hub from ${senderEmail} to registe
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          service_id: 'service_campuspulse',
-          template_id: 'template_event',
-          user_id: 'public_key_campuspulse',
+          service_id: window.ENV?.EMAILJS_SERVICE_ID || 'service_sbynxsk',
+          template_id: window.ENV?.EMAILJS_TEMPLATE_ID || 'template_event',
+          user_id: window.ENV?.EMAILJS_PUBLIC_KEY || 'public_key_campuspulse',
           template_params: {
-            from_email: senderEmail,
             to_email: targetEmail,
+            from_email: senderEmail,
             reply_to: senderEmail,
             subject: emailSubject,
             message: emailBody,

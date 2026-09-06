@@ -7,7 +7,7 @@ window.ENV = {
 
   // EmailJS Configuration (Free automatic email sending to real Gmail inboxes: https://www.emailjs.com)
   EMAILJS_PUBLIC_KEY: "YOUR_EMAILJS_PUBLIC_KEY",
-  EMAILJS_SERVICE_ID: "service_campuspulse",
+  EMAILJS_SERVICE_ID: "service_sbynxsk",
   EMAILJS_TEMPLATE_ID: "template_event",
 
   // Firebase Configuration Credentials
