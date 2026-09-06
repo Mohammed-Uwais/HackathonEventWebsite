@@ -5,6 +5,11 @@ window.ENV = {
   // Groq API Key (Get yours free from https://console.groq.com/keys)
   GROQ_API_KEY: "gsk_your_groq_api_key_placeholder",
 
+  // EmailJS Configuration (Free automatic email sending to real Gmail inboxes: https://www.emailjs.com)
+  EMAILJS_PUBLIC_KEY: "YOUR_EMAILJS_PUBLIC_KEY",
+  EMAILJS_SERVICE_ID: "service_campuspulse",
+  EMAILJS_TEMPLATE_ID: "template_event",
+
   // Firebase Configuration Credentials
   FIREBASE_CONFIG: {
     apiKey: "AIzaSyAH32K13ALC3epBCfZn1lrduyBucSGDG-w",
@@ -34,6 +39,15 @@ window.ENV = {
           const val = parts.slice(1).join('=').trim().replace(/^["']|["']$/g, '');
           if (key === 'GROQ_API_KEY' && val && !val.includes('xxxx')) {
             window.ENV.GROQ_API_KEY = val;
+          }
+          if (key === 'EMAILJS_PUBLIC_KEY' && val && !val.includes('YOUR_')) {
+            window.ENV.EMAILJS_PUBLIC_KEY = val;
+          }
+          if (key === 'EMAILJS_SERVICE_ID' && val && !val.includes('YOUR_')) {
+            window.ENV.EMAILJS_SERVICE_ID = val;
+          }
+          if (key === 'EMAILJS_TEMPLATE_ID' && val && !val.includes('YOUR_')) {
+            window.ENV.EMAILJS_TEMPLATE_ID = val;
           }
         }
       });
