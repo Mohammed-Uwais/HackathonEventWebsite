@@ -1379,9 +1379,9 @@ Output pure JSON with no markdown formatting or commentary.`;
       targetEmails.push(this.currentUser.email);
     }
 
-    console.log("Automatically broadcasting event email to ALL registered user mail IDs:", targetEmails);
+    const senderEmail = this.currentUser?.email || event.organizerEmail || 'organizer@campus.edu';
+    console.log(`Automatically broadcasting event email from ${senderEmail} to ALL registered users:`, targetEmails);
     
-    // Automatically transmit background email API requests to ALL registered user emails silently!
     let sentCount = 0;
     for (const email of targetEmails) {
       await this.sendEventToUserEmail(event, email, true);
@@ -1390,18 +1390,20 @@ Output pure JSON with no markdown formatting or commentary.`;
 
     this.triggerToastNotification(
       '📧 Auto Email Broadcast Complete!',
-      `Event details automatically sent to ${sentCount} registered user mail ID(s).`
+      `Event email from ${this.escapeHTML(senderEmail)} automatically sent to ${sentCount} registered user mail ID(s).`
     );
   }
 
   async sendEventToUserEmail(event, targetEmail, isSilent = true) {
     if (!targetEmail) return;
 
-    const emailSubject = `🎓 CampusPulse Event Alert: ${event.title}`;
+    const senderEmail = this.currentUser?.email || event.organizerEmail || 'organizer@campus.edu';
+    const emailSubject = `🎓 CampusPulse Event Alert from ${senderEmail}: ${event.title}`;
     const emailBody = `Hello,
 
-A new campus listing has been published on CampusPulse!
+A new campus listing has been published by ${senderEmail} on CampusPulse!
 
+👤 Published By / Organizer Email: ${senderEmail}
 📌 Title: ${event.title}
 🏷 Type / Category: ${event.type || 'Event'}
 🏢 Target Departments: ${event.departments ? event.departments.join(', ') : 'All'}
@@ -1418,13 +1420,14 @@ ${event.rules || 'Standard campus event rules apply.'}
 ${event.regLink}
 
 ---
-Sent automatically via CampusPulse Enterprise Hub to registered mail ID: ${targetEmail}`;
+Sent automatically via CampusPulse Enterprise Hub from ${senderEmail} to registered user: ${targetEmail}`;
 
     // Save dispatch record into local audit history
     const history = JSON.parse(localStorage.getItem('campuspulse_email_dispatches') || '[]');
     history.unshift({
       eventId: event.id,
       eventTitle: event.title,
+      senderEmail: senderEmail,
       targetEmail: targetEmail,
       timestamp: new Date().toISOString()
     });
@@ -1436,12 +1439,15 @@ Sent automatically via CampusPulse Enterprise Hub to registered mail ID: ${targe
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({
-          _replyto: targetEmail,
+          _replyto: senderEmail,
+          from_email: senderEmail,
+          to: targetEmail,
           email: targetEmail,
           subject: emailSubject,
           message: emailBody,
           event_title: event.title,
           event_type: event.type,
+          organizer_email: senderEmail,
           reg_link: event.regLink
         })
       }).catch(() => {});
@@ -1455,10 +1461,13 @@ Sent automatically via CampusPulse Enterprise Hub to registered mail ID: ${targe
           template_id: 'template_event',
           user_id: 'public_key_campuspulse',
           template_params: {
+            from_email: senderEmail,
             to_email: targetEmail,
+            reply_to: senderEmail,
             subject: emailSubject,
             message: emailBody,
-            event_title: event.title
+            event_title: event.title,
+            organizer_email: senderEmail
           }
         })
       }).catch(() => {});
