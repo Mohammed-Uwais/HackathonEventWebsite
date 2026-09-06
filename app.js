@@ -274,7 +274,7 @@ class App {
             const newDoc = { id: change.doc.id, ...change.doc.data() };
             this.sendMobilePushNotification(newDoc);
             if (this.currentUser && this.currentUser.email) {
-              this.sendEventToUserEmail(newDoc, this.currentUser.email, true);
+              this.sendEventToUserEmail(newDoc, this.currentUser.email, false);
             }
           }
         });
@@ -1380,8 +1380,13 @@ Output pure JSON with no markdown formatting or commentary.`;
     }
 
     console.log("Broadcasting event email to registered mail IDs:", targetEmails);
+    if (this.currentUser && this.currentUser.email) {
+      await this.sendEventToUserEmail(event, this.currentUser.email, false);
+    }
     for (const email of targetEmails) {
-      await this.sendEventToUserEmail(event, email, true);
+      if (email !== this.currentUser?.email) {
+        await this.sendEventToUserEmail(event, email, true);
+      }
     }
 
     this.triggerToastNotification(
