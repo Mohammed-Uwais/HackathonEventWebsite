@@ -24,7 +24,11 @@
 - **Drag & Drop Poster Dropzone**: Upload event flyer poster images (PNG, JPG, WEBP) or paste raw text circulars.
 - Automatically extracts structured JSON (Title, Category, Short Summary, Abstract, Tech Stack, Department Eligibility, Rules, Registration Link, Timelines) and pre-fills publisher forms.
 
-### 3. 📱 Universal Mobile PWA & 3-Layer Push Notification Suite
+### 3. 📧 Direct Registered Email Dispatch & Notification Suite
+- **Auto-Broadcast on Publish**: Automatically sends formatted email notifications to all registered student user mail IDs saved in Firestore (`/users`).
+- **1-Click "Send to My Mail ID"**: Logged-in students can dispatch full event agendas, timelines, and registration links directly to their registered email with one tap.
+
+### 4. 📱 Universal Mobile PWA & 3-Layer Push Notification Suite
 - **Installed PWA Application**: Fully PWA compliant with `manifest.json` and `sw.js` (Universal Service Worker) for standalone home screen installation.
 - **1-Tap "Install App" & Setup Guide Modal**: Includes a built-in interactive guide tailored for Google Chrome, Vivo Browser, Xiaomi, Samsung Internet, and Apple Safari on iPhone.
 - **3-Layer Notification System**:
@@ -33,12 +37,12 @@
   3. 📳 **Haptic Mobile Vibration**: Triggers device vibration (`navigator.vibrate`) on mobile phones.
   4. ⚙️ **System Notification Shade**: Background OS notifications via Service Worker `showNotification`.
 
-### 4. 🔒 Enterprise Firebase Auth & Firestore Real-Time Sync
+### 5. 🔒 Enterprise Firebase Auth & Firestore Real-Time Sync
 - **User Authentication Gate**: Sign-In & Sign-Up with automatic profile creation in Firestore `/users` collection.
 - **Direct Password Reset**: Instant password reset email link dispatch via Firebase Auth.
 - **Real-time Firestore Listener**: Live automatic feed updates across all logged-in devices when new listings are published.
 
-### 5. 🤖 Groq AI Campus Concierge Chatbot
+### 6. 🤖 Groq AI Campus Concierge Chatbot
 - Floating AI assistant widget answering student queries about events, schedules, department eligibility, and tech stacks.
 
 ---

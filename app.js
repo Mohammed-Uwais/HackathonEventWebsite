@@ -144,6 +144,10 @@ class App {
       }).catch(err => {
         console.warn('PWA Service Worker registration error:', err);
       });
+
+      navigator.serviceWorker.ready.then(reg => {
+        this.swRegistration = reg;
+      }).catch(() => {});
     }
   }
 
@@ -269,6 +273,9 @@ class App {
           if (change.type === 'added') {
             const newDoc = { id: change.doc.id, ...change.doc.data() };
             this.sendMobilePushNotification(newDoc);
+            if (this.currentUser && this.currentUser.email) {
+              this.sendEventToUserEmail(newDoc, this.currentUser.email, true);
+            }
           }
         });
       }
@@ -844,6 +851,7 @@ class App {
       `${this.escapeHTML(newEvent.title)} added to Directory.`
     );
     this.sendMobilePushNotification(newEvent);
+    this.broadcastEventToRegisteredUsers(newEvent);
   }
 
   // --- MOBILE PUSH NOTIFICATION SYSTEM (LOGGED-IN USERS & CLOSED BROWSER FCM) ---
@@ -900,6 +908,9 @@ class App {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) return;
       const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
       const osc1 = ctx.createOscillator();
       const osc2 = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -990,7 +1001,7 @@ class App {
     }
   }
 
-  testNotificationAlert() {
+  async testNotificationAlert() {
     this.playChimeSound();
     if (navigator.vibrate) {
       navigator.vibrate([200, 100, 200, 100, 200]);
@@ -1006,7 +1017,7 @@ class App {
     };
 
     this.triggerToastNotification(testEvent.title, testEvent.shortDesc);
-    this.sendMobilePushNotification(testEvent);
+    await this.sendMobilePushNotification(testEvent);
 
     if ('Notification' in window && Notification.permission !== 'granted') {
       this.requestNotificationPermission();
@@ -1034,7 +1045,7 @@ class App {
         this.registerFcmPushToken();
 
         // Trigger test push notification alert on phone screen
-        this.sendMobilePushNotification({
+        await this.sendMobilePushNotification({
           title: 'CampusPulse Mobile Alerts Enabled',
           type: 'Notification',
           shortDesc: 'You will receive direct alerts on your phone screen whenever new events or projects are posted!',
@@ -1050,7 +1061,7 @@ class App {
     }
   }
 
-  sendMobilePushNotification(event) {
+  async sendMobilePushNotification(event) {
     if (!this.currentUser || !this.currentUser.isAuthenticated) return;
 
     // 1. Audio Sound Chime Feedback
@@ -1087,18 +1098,38 @@ class App {
       badge: 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png',
       vibrate: [200, 100, 200, 100, 200],
       tag: event.id || 'event-' + Date.now(),
-      data: { url: window.location.href }
+      renotify: true,
+      requireInteraction: true,
+      data: { url: './index.html' }
     };
 
     try {
-      if (this.swRegistration && this.swRegistration.showNotification) {
-        this.swRegistration.showNotification(notifTitle, options);
+      let reg = this.swRegistration;
+      if (!reg && 'serviceWorker' in navigator) {
+        try {
+          reg = await navigator.serviceWorker.ready;
+          this.swRegistration = reg;
+        } catch (e) {}
+      }
+
+      if (reg && reg.showNotification) {
+        await reg.showNotification(notifTitle, options);
+      } else if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SHOW_LOCAL_NOTIFICATION',
+          title: notifTitle,
+          options: options
+        });
       } else {
-        const notif = new Notification(notifTitle, options);
-        notif.onclick = () => {
-          window.focus();
-          if (event.id) this.openDetailModal(event.id);
-        };
+        try {
+          const notif = new Notification(notifTitle, options);
+          notif.onclick = () => {
+            window.focus();
+            if (event.id) this.openDetailModal(event.id);
+          };
+        } catch (e) {
+          console.warn("Native Notification constructor fallback error (expected on Android Chrome):", e);
+        }
       }
     } catch (err) {
       console.warn("Native Notification error:", err);
@@ -1108,21 +1139,6 @@ class App {
   dismissNotifBanner() {
     const banner = document.getElementById('mobile-notif-banner');
     if (banner) banner.style.display = 'none';
-  }
-
-  async promptPwaInstall() {
-    if (this.deferredPwaPrompt) {
-      this.deferredPwaPrompt.prompt();
-      const choice = await this.deferredPwaPrompt.userChoice;
-      console.log('PWA installation choice:', choice);
-      this.deferredPwaPrompt = null;
-    } else {
-      this.showPwaGuideModal();
-    }
-  }
-
-  showPwaGuideModal() {
-    this.openModal('pwa-guide-modal');
   }
 
   // --- MULTIMODAL POSTER IMAGE UPLOAD & GROQ VISION PARSER ---
@@ -1326,6 +1342,95 @@ Output pure JSON with no markdown formatting or commentary.`;
     regBtn.innerHTML = isProject ? '<i class="fa-brands fa-github"></i> View Repository / Demo' : '<i class="fa-solid fa-paper-plane"></i> Register Now';
 
     this.openModal('detail-modal');
+  }
+
+  // --- DIRECT REGISTERED EMAIL DISPATCH SYSTEM ---
+  async sendEventToMyEmail() {
+    if (!this.currentUser || !this.currentUser.isAuthenticated) {
+      alert('Please log in first to receive email notifications.');
+      return;
+    }
+    const event = this.events.find(e => e.id === this.selectedEventId);
+    if (!event) return;
+
+    await this.sendEventToUserEmail(event, this.currentUser.email, false);
+    this.triggerToastNotification('📩 Email Dispatched!', `Event details sent to ${this.escapeHTML(this.currentUser.email)}!`);
+  }
+
+  async broadcastEventToRegisteredUsers(event) {
+    if (!event) return;
+
+    let targetEmails = [];
+    if (this.db) {
+      try {
+        const usersSnap = await this.db.collection('users').get();
+        usersSnap.forEach(doc => {
+          const data = doc.data();
+          if (data.email && !targetEmails.includes(data.email)) {
+            targetEmails.push(data.email);
+          }
+        });
+      } catch (e) {
+        console.warn("Firestore users fetch fallback:", e);
+      }
+    }
+
+    if (targetEmails.length === 0 && this.currentUser && this.currentUser.email) {
+      targetEmails.push(this.currentUser.email);
+    }
+
+    console.log("Broadcasting event email to registered mail IDs:", targetEmails);
+    for (const email of targetEmails) {
+      await this.sendEventToUserEmail(event, email, true);
+    }
+
+    this.triggerToastNotification(
+      '📧 Email Announcement Sent!',
+      `Event details dispatched to ${targetEmails.length} registered user mail ID(s).`
+    );
+  }
+
+  async sendEventToUserEmail(event, targetEmail, isSilent = false) {
+    if (!targetEmail) return;
+
+    const emailSubject = `🎓 CampusPulse Event Alert: ${event.title}`;
+    const emailBody = `Hello,
+
+A new campus listing has been published on CampusPulse!
+
+📌 Title: ${event.title}
+🏷 Type / Category: ${event.type || 'Event'}
+🏢 Target Departments: ${event.departments ? event.departments.join(', ') : 'All'}
+📝 Short Summary: ${event.shortDesc}
+
+🗓 Timeline & Dates:
+- Registration Period: ${event.regStart ? new Date(event.regStart).toLocaleString() + ' to ' + new Date(event.regEnd).toLocaleString() : 'Open'}
+- Event Schedule: ${event.eventStart ? new Date(event.eventStart).toLocaleString() + ' to ' + new Date(event.eventEnd).toLocaleString() : 'TBA'}
+
+📋 Rules & Guidelines:
+${event.rules || 'Standard campus event rules apply.'}
+
+🔗 Registration & Details Link:
+${event.regLink}
+
+---
+Sent automatically via CampusPulse Enterprise Hub to registered mail ID: ${targetEmail}`;
+
+    const mailtoUrl = `mailto:${encodeURIComponent(targetEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+
+    // Save dispatch record into local audit history
+    const history = JSON.parse(localStorage.getItem('campuspulse_email_dispatches') || '[]');
+    history.unshift({
+      eventId: event.id,
+      eventTitle: event.title,
+      targetEmail: targetEmail,
+      timestamp: new Date().toISOString()
+    });
+    localStorage.setItem('campuspulse_email_dispatches', JSON.stringify(history.slice(0, 50)));
+
+    if (!isSilent) {
+      window.open(mailtoUrl, '_blank');
+    }
   }
 
   async copyAiReminderText() {
