@@ -1477,10 +1477,12 @@ Sent automatically via CampusPulse Enterprise Hub from ${senderEmail} to registe
     const publicKey = window.ENV?.EMAILJS_PUBLIC_KEY || 'zo8_pyGWh7nYIpmQZ';
     const serviceId = window.ENV?.EMAILJS_SERVICE_ID || 'service_x2wgfce';
     const templateIds = [
-      window.ENV?.EMAILJS_TEMPLATE_ID || 'template_event',
+      window.ENV?.EMAILJS_TEMPLATE_ID || 'pin2cja',
+      'pin2cja',
+      'template_pin2cja',
       'template_0',
       'template_contact',
-      'template_default'
+      'template_event'
     ];
 
     const templateParams = {
