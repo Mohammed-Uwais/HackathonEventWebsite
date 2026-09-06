@@ -1473,46 +1473,64 @@ Sent automatically via CampusPulse Enterprise Hub from ${senderEmail} to registe
     });
     localStorage.setItem('campuspulse_email_dispatches', JSON.stringify(history.slice(0, 50)));
 
-    // 100% AUTOMATIC BACKGROUND TRANSMISSION TO AUTOMATED EMAIL REST API
-    try {
-      fetch('https://formspree.io/f/mqkrpzvq', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          _replyto: senderEmail,
-          from_email: senderEmail,
-          to: targetEmail,
-          email: targetEmail,
-          subject: emailSubject,
-          message: emailBody,
-          event_title: event.title,
-          event_type: event.type,
-          organizer_email: senderEmail,
-          reg_link: event.regLink
-        })
-      }).catch(() => {});
+    // 100% AUTOMATIC BACKGROUND TRANSMISSION VIA EMAILJS SDK & REST API
+    const publicKey = window.ENV?.EMAILJS_PUBLIC_KEY || 'zo8_pyGWh7nYIpmQZ';
+    const serviceId = window.ENV?.EMAILJS_SERVICE_ID || 'service_x2wgfce';
+    const templateIds = [
+      window.ENV?.EMAILJS_TEMPLATE_ID || 'template_event',
+      'template_0',
+      'template_contact',
+      'template_default'
+    ];
 
-      // EmailJS REST API Dispatch
-      fetch('https://api.emailjs.com/api/v1.0/email/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          service_id: window.ENV?.EMAILJS_SERVICE_ID || 'service_x2wgfce',
-          template_id: window.ENV?.EMAILJS_TEMPLATE_ID || 'template_event',
-          user_id: window.ENV?.EMAILJS_PUBLIC_KEY || 'zo8_pyGWh7nYIpmQZ',
-          template_params: {
-            to_email: targetEmail,
-            from_email: senderEmail,
-            reply_to: senderEmail,
-            subject: emailSubject,
-            message: emailBody,
-            event_title: event.title,
-            organizer_email: senderEmail
+    const templateParams = {
+      to_email: targetEmail,
+      to_name: targetEmail,
+      from_name: senderEmail,
+      from_email: senderEmail,
+      reply_to: senderEmail,
+      subject: emailSubject,
+      message: emailBody,
+      event_title: event.title,
+      organizer_email: senderEmail,
+      reg_link: event.regLink
+    };
+
+    if (window.emailjs) {
+      try {
+        window.emailjs.init(publicKey);
+        for (const tId of templateIds) {
+          try {
+            await window.emailjs.send(serviceId, tId, templateParams);
+            console.log(`EmailJS SDK successfully dispatched email to ${targetEmail} using template ${tId}`);
+            break;
+          } catch (e) {
+            console.warn(`EmailJS SDK template ${tId} attempt:`, e);
           }
-        })
-      }).catch(() => {});
-    } catch (e) {
-      console.warn("Background Email API dispatch:", e);
+        }
+      } catch (err) {
+        console.warn("EmailJS SDK init error:", err);
+      }
+    }
+
+    // Direct REST API fallback
+    for (const tId of templateIds) {
+      try {
+        const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            service_id: serviceId,
+            template_id: tId,
+            user_id: publicKey,
+            template_params: templateParams
+          })
+        });
+        if (res.ok) {
+          console.log(`EmailJS REST API successfully dispatched email to ${targetEmail} using template ${tId}`);
+          break;
+        }
+      } catch (e) {}
     }
   }
 
