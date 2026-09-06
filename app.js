@@ -1486,6 +1486,7 @@ Sent automatically via CampusPulse Enterprise Hub from ${senderEmail} to registe
     ];
 
     const templateParams = {
+      email: targetEmail,
       to_email: targetEmail,
       to_name: targetEmail,
       from_name: senderEmail,
