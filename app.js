@@ -320,6 +320,10 @@ class App {
     this.updateUserUI();
     this.renderEvents();
 
+    if (this.currentUser && this.currentUser.email) {
+      this.registerLoggedUserEmail(this.currentUser.email);
+    }
+
     // Check Notification Permission for logged-in user & show banner if not granted
     if ('Notification' in window) {
       const banner = document.getElementById('mobile-notif-banner');
@@ -1345,6 +1349,15 @@ Output pure JSON with no markdown formatting or commentary.`;
   }
 
   // --- DIRECT REGISTERED EMAIL DISPATCH SYSTEM ---
+  registerLoggedUserEmail(email) {
+    if (!email) return;
+    const stored = JSON.parse(localStorage.getItem('campuspulse_all_registered_emails') || '[]');
+    if (!stored.includes(email)) {
+      stored.push(email);
+      localStorage.setItem('campuspulse_all_registered_emails', JSON.stringify(stored));
+    }
+  }
+
   async sendEventToMyEmail() {
     if (!this.currentUser || !this.currentUser.isAuthenticated) {
       alert('Please log in first to receive email notifications.');
@@ -1361,6 +1374,8 @@ Output pure JSON with no markdown formatting or commentary.`;
     if (!event) return;
 
     let targetEmails = [];
+
+    // 1. Fetch from Firestore 'users' collection
     if (this.db) {
       try {
         const usersSnap = await this.db.collection('users').get();
@@ -1371,17 +1386,42 @@ Output pure JSON with no markdown formatting or commentary.`;
           }
         });
       } catch (e) {
-        console.warn("Firestore users fetch fallback:", e);
+        console.warn("Firestore users fetch:", e);
+      }
+
+      // 2. Fetch from Firestore 'fcm_tokens' collection
+      try {
+        const fcmSnap = await this.db.collection('fcm_tokens').get();
+        fcmSnap.forEach(doc => {
+          const data = doc.data();
+          if (data.email && !targetEmails.includes(data.email)) {
+            targetEmails.push(data.email);
+          }
+        });
+      } catch (e) {
+        console.warn("Firestore fcm_tokens fetch:", e);
       }
     }
 
+    // 3. Fetch from local storage registered users registry
+    const storedUsers = JSON.parse(localStorage.getItem('campuspulse_all_registered_emails') || '[]');
+    storedUsers.forEach(email => {
+      if (email && !targetEmails.includes(email)) {
+        targetEmails.push(email);
+      }
+    });
+
+    // 4. Ensure current logged-in user email is included
     if (this.currentUser && this.currentUser.email && !targetEmails.includes(this.currentUser.email)) {
       targetEmails.push(this.currentUser.email);
     }
 
+    // Update persistent cache of all registered user mail IDs
+    localStorage.setItem('campuspulse_all_registered_emails', JSON.stringify(targetEmails));
+
     const senderEmail = this.currentUser?.email || event.organizerEmail || 'organizer@campus.edu';
-    console.log(`Automatically broadcasting event email from ${senderEmail} to ALL registered users:`, targetEmails);
-    
+    console.log(`Broadcasting event email from ${senderEmail} to ALL ${targetEmails.length} logged-in users:`, targetEmails);
+
     let sentCount = 0;
     for (const email of targetEmails) {
       await this.sendEventToUserEmail(event, email, true);
@@ -1389,8 +1429,8 @@ Output pure JSON with no markdown formatting or commentary.`;
     }
 
     this.triggerToastNotification(
-      '📧 Auto Email Broadcast Complete!',
-      `Event email from ${this.escapeHTML(senderEmail)} automatically sent to ${sentCount} registered user mail ID(s).`
+      '📧 Email Sent to All Logged-in Users!',
+      `Event email from ${this.escapeHTML(senderEmail)} automatically dispatched to ${sentCount} user mail ID(s).`
     );
   }
 
