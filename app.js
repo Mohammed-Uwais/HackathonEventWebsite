@@ -1416,13 +1416,12 @@ ${event.regLink}
 ---
 Sent automatically via CampusPulse Enterprise Hub to registered mail ID: ${targetEmail}`;
 
-    // 1. Direct Web Gmail Compose URL (Opens Gmail Web directly in browser with pre-filled email)
-    const gmailWebUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(targetEmail)}&su=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-    
-    // 2. Standard Mailto URL fallback
-    const mailtoUrl = `mailto:${encodeURIComponent(targetEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+    this.activeEmailText = emailBody;
 
-    // 3. Save dispatch record into local audit history
+    // Direct Web Gmail Compose URL (Opens Gmail Web directly in browser with pre-filled email)
+    const gmailWebUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(targetEmail)}&su=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+
+    // Save dispatch record into local audit history
     const history = JSON.parse(localStorage.getItem('campuspulse_email_dispatches') || '[]');
     history.unshift({
       eventId: event.id,
@@ -1432,24 +1431,26 @@ Sent automatically via CampusPulse Enterprise Hub to registered mail ID: ${targe
     });
     localStorage.setItem('campuspulse_email_dispatches', JSON.stringify(history.slice(0, 50)));
 
-    // 4. Background REST Email API dispatch
-    try {
-      fetch('https://formspree.io/f/xbjnqvgw', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          _replyto: targetEmail,
-          email: targetEmail,
-          subject: emailSubject,
-          message: emailBody
-        })
-      }).catch(() => {});
-    } catch (e) {}
-
     if (!isSilent) {
-      // Open Gmail Web Compose tab directly in browser for instant 1-click delivery
-      window.open(gmailWebUrl, '_blank') || window.open(mailtoUrl, '_blank');
+      // Pop up the Email Dispatcher Modal with direct Gmail 1-Click button
+      const modalTitle = document.getElementById('email-modal-event-title');
+      const modalTarget = document.getElementById('email-modal-target-email');
+      const modalPreview = document.getElementById('email-modal-preview');
+      const modalBtn = document.getElementById('btn-email-modal-gmail');
+
+      if (modalTitle) modalTitle.textContent = event.title;
+      if (modalTarget) modalTarget.textContent = targetEmail;
+      if (modalPreview) modalPreview.textContent = emailBody;
+      if (modalBtn) modalBtn.href = gmailWebUrl;
+
+      this.openModal('email-dispatch-modal');
     }
+  }
+
+  copyEmailTextToClipboard() {
+    if (!this.activeEmailText) return;
+    navigator.clipboard.writeText(this.activeEmailText);
+    this.triggerToastNotification('Email Text Copied!', 'Complete event email text copied to clipboard!');
   }
 
   async copyAiReminderText() {
