@@ -410,13 +410,27 @@
       updateMetrics();
 
       if (filtered.length === 0) {
+        let emptyMessage = 'No event or project submissions match the selected tab filter or search query.';
+        let emptyActionBtn = '';
+
+        if (activeTab === 'pending') {
+          emptyMessage = 'All submitted events have been reviewed! Click below to view approved and published events.';
+          const approvedCount = adminEvents.filter(e => !e.approvalStatus || e.approvalStatus === 'approved').length;
+          emptyActionBtn = `
+            <button onclick="setAdminTab('approved')" class="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow transition flex items-center gap-2">
+              <i class="fa-solid fa-circle-check"></i> View ${approvedCount} Approved & Live Events
+            </button>
+          `;
+        }
+
         container.innerHTML = `
           <div class="bg-white border border-slate-200 rounded-2xl p-12 text-center flex flex-col items-center justify-center gap-3">
             <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center text-2xl">
               <i class="fa-regular fa-folder-open"></i>
             </div>
-            <h3 class="text-base font-bold text-slate-800">No Submissions Found</h3>
-            <p class="text-xs text-slate-500 max-w-sm">No event or project submissions match the selected tab filter or search query.</p>
+            <h3 class="text-base font-bold text-slate-800">No Pending Submissions</h3>
+            <p class="text-xs text-slate-500 max-w-sm">${emptyMessage}</p>
+            ${emptyActionBtn}
           </div>
         `;
         return;
@@ -512,10 +526,11 @@
 
       if (db) {
         try {
-          await db.collection('events').doc(eventId).update({
+          await db.collection('events').doc(eventId).set({
+            ...event,
             approvalStatus: 'approved',
             approvedAt: event.approvedAt
-          });
+          }, { merge: true });
         } catch (e) {
           console.warn("Firestore accept update fallback:", e);
         }
@@ -544,10 +559,11 @@
 
       if (db) {
         try {
-          await db.collection('events').doc(eventId).update({
+          await db.collection('events').doc(eventId).set({
+            ...event,
             approvalStatus: 'declined',
             declinedAt: event.declinedAt
-          });
+          }, { merge: true });
         } catch (e) {
           console.warn("Firestore decline update fallback:", e);
         }
