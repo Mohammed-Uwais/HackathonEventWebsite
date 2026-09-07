@@ -766,11 +766,35 @@ class App {
     const groupTech = document.getElementById('group-tech-stack');
     const groupRegDates = document.getElementById('group-pub-reg-dates');
     const groupEventDates = document.getElementById('group-pub-event-dates');
-    const groupRules = document.getElementById('group-pub-rules');
+    const pubTypeSelect = document.getElementById('pub-type');
 
     if (groupTech) groupTech.style.display = isProject ? 'block' : 'none';
     if (groupRegDates) groupRegDates.style.display = isProject ? 'none' : 'flex';
     if (groupEventDates) groupEventDates.style.display = isProject ? 'none' : 'flex';
+
+    if (pubTypeSelect) {
+      if (isProject) {
+        pubTypeSelect.innerHTML = `
+          <option value="Research Paper">Research Paper</option>
+          <option value="Capstone Project">Capstone Project</option>
+          <option value="Hardware Prototype">Hardware Prototype</option>
+          <option value="AI / ML Model">AI / ML Model</option>
+          <option value="Software Application">Software Application</option>
+          <option value="Open Source Tool">Open Source Tool</option>
+          <option value="Others">Others</option>
+        `;
+      } else {
+        pubTypeSelect.innerHTML = `
+          <option value="Hackathon">Hackathon</option>
+          <option value="Symposium">Symposium</option>
+          <option value="Workshop">Workshop</option>
+          <option value="Seminar">Seminar</option>
+          <option value="Quiz">Quiz Competition</option>
+          <option value="Cultural">Cultural Event</option>
+          <option value="Others">Others</option>
+        `;
+      }
+    }
 
     document.getElementById('lbl-pub-title').textContent = isProject ? 'Project / Paper Title *' : 'Listing Title *';
     document.getElementById('lbl-pub-full-desc').textContent = isProject ? 'Project Abstract / Methodology *' : 'Full Description / Breakdown *';
@@ -880,6 +904,70 @@ class App {
       return;
     }
 
+    if (this.activeDirectory === 'history') {
+      gridContainer.className = "w-full";
+      gridContainer.innerHTML = `
+        <div class="w-full bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-4">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm border-collapse">
+              <thead>
+                <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50">
+                  <th class="py-3 px-4 font-semibold">Date & Time</th>
+                  <th class="py-3 px-4 font-semibold">Category</th>
+                  <th class="py-3 px-4 font-semibold">Listing Title</th>
+                  <th class="py-3 px-4 font-semibold">Departments</th>
+                  <th class="py-3 px-4 font-semibold">Status</th>
+                  <th class="py-3 px-4 font-semibold text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
+                ${filtered.map(event => {
+                  const statusInfo = this.evaluateEventStatus(event);
+                  const eventDateFormatted = event.eventStart ? new Date(event.eventStart).toLocaleDateString('en-US', {
+                    month: 'short', day: 'numeric', year: 'numeric'
+                  }) : 'Past Date';
+                  const deptsHtml = event.departments.map(d => `<span class="dept-tag">${this.escapeHTML(d)}</span>`).join('');
+                  const recResult = this.runRecommendationAgent(event);
+
+                  return `
+                    <tr class="hover:bg-slate-50/80 transition cursor-pointer" onclick="app.openDetailModal('${this.escapeHTML(event.id)}')">
+                      <td class="py-3 px-4 text-xs font-mono text-slate-500 whitespace-nowrap">
+                        <i class="fa-regular fa-calendar text-blue-600 mr-1"></i> ${eventDateFormatted}
+                      </td>
+                      <td class="py-3 px-4 whitespace-nowrap">
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                          ${this.escapeHTML(event.type)}
+                        </span>
+                      </td>
+                      <td class="py-3 px-4 font-semibold text-slate-900">
+                        <div class="flex items-center gap-2">
+                          <span>${this.escapeHTML(event.title)}</span>
+                          ${recResult.isRecommended ? '<span class="badge-recommended text-[10px] py-0 px-1.5"><i class="fa-solid fa-wand-magic-sparkles"></i> Rec</span>' : ''}
+                        </div>
+                      </td>
+                      <td class="py-3 px-4">
+                        <div class="card-dept-tags">${deptsHtml}</div>
+                      </td>
+                      <td class="py-3 px-4 whitespace-nowrap">
+                        <span class="card-status-badge ${statusInfo.class}">${statusInfo.label}</span>
+                      </td>
+                      <td class="py-3 px-4 text-right whitespace-nowrap">
+                        <button class="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-semibold transition" onclick="event.stopPropagation(); app.openDetailModal('${this.escapeHTML(event.id)}')">
+                          <i class="fa-solid fa-eye mr-1"></i> View Record
+                        </button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    gridContainer.className = "events-grid";
     gridContainer.innerHTML = filtered.map(event => {
       const statusInfo = this.evaluateEventStatus(event);
       const posterImg = this.sanitizeGoogleDriveUrl(event.posterUrl);
@@ -897,8 +985,8 @@ class App {
 
       if (this.activeDirectory === 'projects') {
         const techHtml = (event.techStack || []).map(t => `<span class="tech-chip">${this.escapeHTML(t)}</span>`).join('');
-        const badgeClass = event.type === 'Research' ? 'research' : 'project';
-        const badgeLabel = event.type === 'Research' ? '🔬 Research Paper' : '💡 Student Project';
+        const badgeClass = event.type === 'Research Paper' || event.type === 'Research' ? 'research' : 'project';
+        const badgeLabel = event.type === 'Research Paper' ? '🔬 Research Paper' : `💡 ${this.escapeHTML(event.type)}`;
 
         return `
           <div class="event-card ${recGlowClass}" style="border:1px solid #e2e8f0;" onclick="app.openDetailModal('${this.escapeHTML(event.id)}')">
@@ -1455,10 +1543,10 @@ class App {
     const systemPrompt = `You are an AI vision & document parser for a campus platform. Parse the user's announcement text and/or poster image and output ONLY a valid JSON object matching this schema:
 {
   "title": "string",
-  "type": "Symposium | Hackathon | Quiz | Workshop | Seminar | Cultural | Sports | Project | Research",
+  "type": "Symposium | Hackathon | Quiz | Workshop | Seminar | Cultural | Research Paper | Capstone Project | Hardware Prototype | AI / ML Model | Software Application | Open Source Tool | Others",
   "shortDesc": "string max 120 chars",
   "fullDesc": "string",
-  "departments": ["CSE", "ECE", "IT", "AIDS", "EEE", "MECH"],
+  "departments": ["CSE", "ECE", "IT", "AIDS", "EEE", "MECH", "Others"],
   "rules": "string",
   "regStart": "YYYY-MM-DDTHH:mm",
   "regEnd": "YYYY-MM-DDTHH:mm",
@@ -1495,15 +1583,27 @@ Output pure JSON with no markdown formatting or commentary.`;
         }
 
         const visionModels = hasImage
-          ? ['llama-3.2-11b-vision-preview', 'llama-3.2-90b-vision-preview', 'openai/gpt-oss-20b', 'qwen/qwen3.6-27b']
+          ? ['llama-3.2-11b-vision-preview', 'llama-3.2-90b-vision-preview']
           : ['openai/gpt-oss-20b', 'qwen/qwen3.6-27b'];
 
-        const content = await this.callGroqApi(apiKey, messages, 0.2, visionModels);
+        const content = await this.callGroqApi(apiKey, messages, 0.1, visionModels, { type: "json_object" });
         parsed = JSON.parse(content.trim().replace(/```json|```/g, ''));
       } else {
         parsed = {
           title: hasImage ? 'Extracted: Campus Event Poster 2026' : 'Parsed: Tech Symposium 2026',
           type: 'Symposium',
+          shortDesc: rawText ? rawText.substring(0, 100) + '...' : 'Parsed event details from uploaded poster flyer.',
+          fullDesc: rawText || 'Event flyer extracted via Groq Vision AI.',
+          departments: ['CSE', 'ECE'],
+          rules: 'Bring valid college ID card.',
+          regStart: new Date().toISOString().slice(0, 16),
+          regEnd: new Date(Date.now() + 86400000 * 5).toISOString().slice(0, 16),
+          eventStart: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 16),
+          eventEnd: new Date(Date.now() + 86400000 * 7 + 14400000).toISOString().slice(0, 16),
+          regLink: 'https://forms.google.com/sample',
+          posterUrl: this.aiPosterBase64 || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80'
+        };
+      }
           shortDesc: rawText ? rawText.substring(0, 100) + '...' : 'Parsed event details from uploaded poster flyer.',
           fullDesc: rawText || 'Event flyer extracted via Groq Vision AI.',
           departments: ['CSE', 'ECE'],
@@ -1895,7 +1995,7 @@ _Published via CampusPulse_`;
       status: e.directory === 'projects' ? 'Published Showcase' : this.evaluateEventStatus(e).label
     })));
 
-    const systemPrompt = `You are Campus Concierge AI for LICET. Help students find relevant campus events, competitions, and ongoing student projects/research papers based on this live JSON directory:\n${eventsContext}\nAnswer concisely and helpfully. Highlight relevant departments, tech stacks, or event dates when appropriate.`;
+    const systemPrompt = `You are CampusPulse AI Concierge, an internal local assistant embedded in the campus platform. Your sole mandate is to assist users STRICTLY based on the active local JSON database of events, competitions, and student projects/papers provided below:\n${eventsContext}\n\nSTRICT OPERATIONAL GUIDELINES:\n1. INTERNAL SCOPE ONLY: Answer user questions ONLY using the local database records provided above. Reject general world queries, external news, or out-of-scope questions with: "I am a local campus assistant for CampusPulse. I can only answer questions regarding active campus events, hackathons, and student projects stored in our system."\n2. CONCISE & ACTIONABLE: Provide structured, helpful answers referencing titles, departments, registration links, and deadlines.\n3. SAFETY: Do not expose internal credentials or private tokens.`;
 
     try {
       let botResponseText = '';
