@@ -1,5 +1,5 @@
 // CampusPulse Universal PWA Service Worker with Offline Caching & FCM Closed-Browser Push Engine
-const CACHE_NAME = 'campuspulse-pwa-v3';
+const CACHE_NAME = 'campuspulse-pwa-v4';
 
 const ASSETS_TO_CACHE = [
   './',
