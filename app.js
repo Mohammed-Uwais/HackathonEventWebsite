@@ -1205,6 +1205,7 @@ class App {
     const posterUrl = document.getElementById('pub-poster-url').value;
 
     const newEvent = {
+      id: 'evt-' + Date.now(),
       directory,
       title,
       type,
@@ -1224,21 +1225,26 @@ class App {
       createdAt: new Date().toISOString()
     };
 
+    // 1. Always unshift to local events array & save to LocalStorage immediately
+    this.events.unshift(newEvent);
+    this.saveEventsToStorage();
+
+    // 2. Also persist to Firestore if online/connected
     if (this.db) {
       try {
         const docRef = await this.db.collection('events').add(newEvent);
-        newEvent.id = docRef.id;
+        if (docRef && docRef.id) {
+          newEvent.id = docRef.id;
+          await this.db.collection('events').doc(docRef.id).set(newEvent, { merge: true });
+          this.saveEventsToStorage();
+        }
       } catch (err) {
         console.warn("Firestore save fallback:", err);
-        newEvent.id = 'evt-' + Date.now();
-        this.events.unshift(newEvent);
-        this.saveEventsToStorage();
       }
-    } else {
-      newEvent.id = 'evt-' + Date.now();
-      this.events.unshift(newEvent);
-      this.saveEventsToStorage();
     }
+
+    // 3. Dispatch storage event for instant cross-tab real-time sync with Admin Portal
+    window.dispatchEvent(new Event('storage'));
 
     this.switchDirectory(directory);
     this.closeModal('publish-modal');

@@ -340,20 +340,45 @@
     }
 
     function initFirebaseIfAvailable() {
-      if (window.firebase && firebase.apps && firebase.apps.length > 0) {
-        db = firebase.firestore();
-        db.collection('events').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
-          if (!snapshot.empty) {
-            const docs = [];
-            snapshot.forEach(doc => {
-              docs.push({ id: doc.id, ...doc.data() });
-            });
-            adminEvents = docs;
-            saveEventsToStorage();
-            renderAdminList();
+      if (window.firebase) {
+        try {
+          if (!firebase.apps.length) {
+            const savedConfig = localStorage.getItem('campuspulse_firebase_config');
+            const config = savedConfig ? JSON.parse(savedConfig) : {
+              apiKey: "AIzaSyAH32K13ALC3epBCfZn1lrduyBucSGDG-w",
+              authDomain: "hackathon-3-event-website.firebaseapp.com",
+              projectId: "hackathon-3-event-website",
+              storageBucket: "hackathon-3-event-website.firebasestorage.app",
+              messagingSenderId: "308620504514",
+              appId: "1:308620504514:web:8bb8f1ee7d6548f406ba5b",
+              measurementId: "G-GDFKR3XZDL"
+            };
+            firebase.initializeApp(config);
           }
-        });
+          db = firebase.firestore();
+          db.collection('events').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+            if (!snapshot.empty) {
+              const docs = [];
+              snapshot.forEach(doc => {
+                docs.push({ id: doc.id, ...doc.data() });
+              });
+              adminEvents = docs;
+              saveEventsToStorage();
+              renderAdminList();
+            }
+          });
+        } catch (err) {
+          console.warn("Admin Firebase init error:", err);
+        }
       }
+
+      // Storage event listener for cross-tab instant sync when student submits an event
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'campuspulse_events') {
+          loadEventsFromStorage();
+          renderAdminList();
+        }
+      });
     }
 
     function updateMetrics() {
