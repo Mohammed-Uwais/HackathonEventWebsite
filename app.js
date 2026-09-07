@@ -1721,9 +1721,28 @@ Output pure JSON with no markdown formatting or commentary.`;
 
       // Seamless fallback parser if Groq API is quota-restricted or offline
       if (!parsed) {
-        const titleMatch = rawText ? rawText.split('\n')[0] : '';
+        let extractedPosterUrl = this.aiPosterBase64 || '';
+        let extractedRegLink = '';
+        let extractedTitle = '';
+
+        if (rawText) {
+          const posterUrlMatch = rawText.match(/(?:Poster Image URL|Poster URL|Image URL):\s*(https?:\/\/[^\s]+)/i);
+          if (posterUrlMatch) extractedPosterUrl = posterUrlMatch[1];
+
+          const regLinkMatch = rawText.match(/(?:Registration Link|Reg Link|Form Link):\s*(https?:\/\/[^\s]+)/i);
+          if (regLinkMatch) extractedRegLink = regLinkMatch[1];
+
+          const titleMatch = rawText.match(/(?:Event Title|Title|Name):\s*([^\n]+)/i);
+          if (titleMatch) {
+            extractedTitle = titleMatch[1].trim();
+          } else {
+            const firstLine = rawText.split('\n')[0].replace(/(?:Poster Image URL|Registration Link|Reg Link):.*$/i, '').trim();
+            if (firstLine && firstLine.length < 80) extractedTitle = firstLine;
+          }
+        }
+
         parsed = {
-          title: titleMatch && titleMatch.length < 80 ? titleMatch : (hasImage ? 'Extracted: Campus Event Poster 2026' : 'Parsed Campus Event 2026'),
+          title: extractedTitle || (hasImage ? 'Extracted: Campus Event Poster 2026' : 'Parsed Campus Event 2026'),
           type: 'Symposium',
           shortDesc: rawText ? rawText.substring(0, 110) + '...' : 'Event poster uploaded. Details pre-filled in manual form.',
           fullDesc: rawText || 'Event flyer loaded via AI Smart Publisher.',
@@ -1733,8 +1752,8 @@ Output pure JSON with no markdown formatting or commentary.`;
           regEnd: new Date(Date.now() + 86400000 * 5).toISOString().slice(0, 16),
           eventStart: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 16),
           eventEnd: new Date(Date.now() + 86400000 * 7 + 14400000).toISOString().slice(0, 16),
-          regLink: 'https://forms.google.com/sample',
-          posterUrl: this.aiPosterBase64 || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80'
+          regLink: extractedRegLink || 'https://forms.google.com/sample',
+          posterUrl: extractedPosterUrl || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80'
         };
       }
 
