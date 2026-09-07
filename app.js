@@ -867,12 +867,6 @@ class App {
     let filtered = this.events.filter(event => {
       const statusInfo = this.evaluateEventStatus(event);
 
-      // 0. Admin Approval Filter: Only show approved events on the public dashboard (or legacy seeds with no status)
-      const appStatus = (event.approvalStatus || 'approved').toLowerCase();
-      if (appStatus !== 'approved') {
-        return false;
-      }
-
       // 1. Directory Filter (events vs projects vs history)
       if (this.activeDirectory === 'history') {
         const itemDir = event.directory || (event.type === 'Project' || event.type === 'Research' ? 'projects' : 'events');
@@ -1221,7 +1215,6 @@ class App {
       regLink,
       posterUrl,
       organizerEmail: this.currentUser.email,
-      approvalStatus: 'pending',
       createdAt: new Date().toISOString()
     };
 
@@ -1243,65 +1236,14 @@ class App {
       }
     }
 
-    // 3. Dispatch storage event for instant cross-tab real-time sync with Admin Portal
-    window.dispatchEvent(new Event('storage'));
-
     this.switchDirectory(directory);
     this.closeModal('publish-modal');
     this.triggerToastNotification(
-      '⌛ Submitted for Admin Approval!',
-      `"${this.escapeHTML(newEvent.title)}" has been submitted and is pending Admin approval. Once accepted, it will appear on the discovery dashboard.`
+      directory === 'projects' ? '💡 New Project / Paper Published!' : '🎉 New Event Published!',
+      `"${this.escapeHTML(newEvent.title)}" added to Directory.`
     );
-  }
-
-  // --- ADMIN APPROVAL & MODERATION WORKFLOW ---
-  async approveEvent(eventId) {
-    const targetIndex = this.events.findIndex(e => e.id === eventId);
-    if (targetIndex === -1) return;
-    const event = this.events[targetIndex];
-
-    event.approvalStatus = 'approved';
-    event.approvedAt = new Date().toISOString();
-
-    if (this.db) {
-      try {
-        await this.db.collection('events').doc(eventId).update({
-          approvalStatus: 'approved',
-          approvedAt: event.approvedAt
-        });
-      } catch (err) {
-        console.warn("Firestore approve update error:", err);
-      }
-    }
-
-    this.saveEventsToStorage();
-    this.triggerToastNotification('🎉 Event Approved & Published!', `"${this.escapeHTML(event.title)}" is now live on the campus discovery dashboard.`);
-    this.broadcastEventToRegisteredUsers(event);
-    this.sendMobilePushNotification(event);
-    this.renderEvents();
-  }
-
-  async declineEvent(eventId) {
-    const targetIndex = this.events.findIndex(e => e.id === eventId);
-    if (targetIndex === -1) return;
-    const event = this.events[targetIndex];
-
-    event.approvalStatus = 'declined';
-    event.declinedAt = new Date().toISOString();
-
-    if (this.db) {
-      try {
-        await this.db.collection('events').doc(eventId).update({
-          approvalStatus: 'declined',
-          declinedAt: event.declinedAt
-        });
-      } catch (err) {
-        console.warn("Firestore decline update error:", err);
-      }
-    }
-
-    this.saveEventsToStorage();
-    this.triggerToastNotification('🚫 Event Submission Declined', `"${this.escapeHTML(event.title)}" was declined and will not appear in the discovery dashboard.`);
+    this.sendMobilePushNotification(newEvent);
+    this.broadcastEventToRegisteredUsers(newEvent);
     this.renderEvents();
   }
 
