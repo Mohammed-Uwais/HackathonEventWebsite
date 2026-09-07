@@ -105,7 +105,8 @@ class App {
   constructor() {
     this.events = [];
     this.currentUser = null;
-    this.activeDirectory = 'events'; // Dual Directory switcher state: 'events' vs 'projects'
+    this.userProfile = null;
+    this.activeDirectory = 'events'; // Switcher state: 'events', 'projects', 'history'
     this.activeDeptFilter = '';
     this.selectedEventId = null;
     this.otpState = { email: '', code: '' };
@@ -123,6 +124,13 @@ class App {
       }
     } else {
       this.firebaseConfig = this.getDefaultFirebaseConfig();
+    }
+
+    const savedProfile = localStorage.getItem('campuspulse_user_profile');
+    if (savedProfile) {
+      try {
+        this.userProfile = JSON.parse(savedProfile);
+      } catch (e) {}
     }
 
     this.initFirebase();
@@ -202,17 +210,21 @@ class App {
         this.db = firebase.firestore();
         this.auth = firebase.auth();
         
-        // SESSION PERSISTENCE: Maintain active user session across page reloads
-        this.auth.onAuthStateChanged((user) => {
+        // SESSION PERSISTENCE: Maintain active user session across page reloads & fetch Firestore Profile
+        this.auth.onAuthStateChanged(async (user) => {
           if (user) {
             this.currentUser = {
               uid: user.uid,
               email: user.email,
               isAuthenticated: true
             };
+
+            await this.fetchUserProfileFromFirestore(user.uid);
             this.showMainWebsiteScreen();
             this.registerFcmPushToken();
           } else {
+            this.currentUser = null;
+            this.userProfile = null;
             this.showAuthLandingGate();
           }
         });
@@ -386,13 +398,13 @@ class App {
           lastLogin: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
 
-        console.log("Successfully stored user document in Firestore 'users' collection:", uid);
-
         this.currentUser = {
           uid: uid,
           email: userCred.user.email,
           isAuthenticated: true
         };
+
+        await this.fetchUserProfileFromFirestore(uid);
 
         localStorage.setItem('campuspulse_user', JSON.stringify(this.currentUser));
         this.showMainWebsiteScreen();
@@ -405,19 +417,30 @@ class App {
     } catch (err) {
       console.error("Firebase Sign In Error:", err);
       if (errDiv) {
-        errDiv.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${this.escapeHTML(err.message || 'Invalid user ID. Please check your email or sign up.')}`;
+        let displayError = 'Invalid user ID. Please check your email or sign up.';
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-email' || err.code === 'auth/invalid-credential') {
+          displayError = 'Invalid user ID. Please check your email address or sign up for a new account.';
+        } else if (err.code === 'auth/wrong-password') {
+          displayError = 'Invalid password. Please check your password or use password reset.';
+        }
+        errDiv.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${this.escapeHTML(displayError)}`;
         errDiv.classList.remove('hidden');
       }
-      this.triggerToastNotification('Sign In Failed', err.message || 'Invalid email or password.');
+      this.triggerToastNotification('Sign In Failed', 'Invalid email or password.');
     } finally {
       btn.disabled = false;
       btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
     }
   }
 
-  // --- SIGN UP FLOW & DIRECT FIRESTORE USER DOCUMENT WRITE ---
+  // --- SIGN UP FLOW & DIRECT FIRESTORE USER DOCUMENT WRITE (ENHANCED ONBOARDING SCHEMA) ---
   async handleGateSignUp(e) {
     e.preventDefault();
+    const fullName = document.getElementById('gate-signup-fullname')?.value.trim() || 'Campus Student';
+    const dept = document.getElementById('gate-signup-dept')?.value || 'CSE';
+    const batch = document.getElementById('gate-signup-batch')?.value.trim() || '2022-2026';
+    const dob = document.getElementById('gate-signup-dob')?.value || '';
+    const phone = document.getElementById('gate-signup-phone')?.value.trim() || '';
     const email = document.getElementById('gate-signup-email').value.trim();
     const password = document.getElementById('gate-signup-password').value;
     const btn = document.getElementById('btn-gate-signup');
@@ -433,35 +456,48 @@ class App {
         const userCred = await this.auth.createUserWithEmailAndPassword(email, password);
         const uid = userCred.user.uid;
 
-        // 2. Direct write to Firestore 'users' collection
-        await this.db.collection('users').doc(uid).set({
-          email: email,
+        const profileData = {
           uid: uid,
+          email: email,
+          fullName: fullName,
+          department: dept,
+          batch: batch,
+          dob: dob,
+          phone: phone,
+          interests: 'AI, Machine Learning, Web Apps, Robotics',
+          groqApiKey: '',
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        };
 
-        console.log("Successfully created user document in Firestore 'users' collection:", uid);
+        // 2. Direct write to Firestore 'users' collection
+        await this.db.collection('users').doc(uid).set(profileData, { merge: true });
+
+        console.log("Successfully created user onboarding profile in Firestore 'users' collection:", uid);
 
         this.currentUser = {
           uid: uid,
           email: email,
           isAuthenticated: true
         };
+        this.userProfile = profileData;
 
         localStorage.setItem('campuspulse_user', JSON.stringify(this.currentUser));
+        localStorage.setItem('campuspulse_user_profile', JSON.stringify(profileData));
+
         this.showMainWebsiteScreen();
-        this.triggerToastNotification('Account Created & Saved in Database', `User ${this.escapeHTML(email)} stored in Firestore!`);
+        this.triggerToastNotification('Account Created & Saved in Database', `User ${this.escapeHTML(fullName)} stored in Firestore!`);
       } else {
         this.currentUser = { email, isAuthenticated: true };
+        this.userProfile = { fullName, department: dept, batch, dob, phone, email };
         localStorage.setItem('campuspulse_user', JSON.stringify(this.currentUser));
+        localStorage.setItem('campuspulse_user_profile', JSON.stringify(this.userProfile));
         this.showMainWebsiteScreen();
       }
     } catch (err) {
       console.error("Firebase Sign Up Error:", err);
       let errorMsg = err.message || 'Failed to create user account.';
       
-      // Catch disabled Email/Password authentication setting
       if (err.code === 'auth/operation-not-allowed') {
         errorMsg = 'Email/Password sign-in is currently disabled in your Firebase Console! Please enable it under Authentication -> Sign-in method.';
       }
@@ -531,14 +567,170 @@ class App {
     }
   }
 
+  // --- FIRESTORE USER PROFILE DASHBOARD & DATABASE-BACKED API KEY ENGINE ---
+  async fetchUserProfileFromFirestore(uid) {
+    if (!this.db || !uid) return;
+    try {
+      const doc = await this.db.collection('users').doc(uid).get();
+      if (doc.exists) {
+        this.userProfile = { uid: doc.id, ...doc.data() };
+        localStorage.setItem('campuspulse_user_profile', JSON.stringify(this.userProfile));
+        console.log("Loaded user profile from Firestore:", this.userProfile);
+      }
+    } catch (e) {
+      console.warn("Error fetching profile from Firestore:", e);
+    }
+  }
+
+  openProfileModal() {
+    if (!this.currentUser) {
+      alert("Please sign in first to access your Profile Dashboard.");
+      return;
+    }
+    const profile = this.userProfile || {
+      fullName: 'Campus User',
+      email: this.currentUser.email,
+      department: 'CSE',
+      batch: '2022-2026',
+      phone: '',
+      dob: '',
+      interests: 'AI, Machine Learning, Web Development, Robotics',
+      groqApiKey: ''
+    };
+
+    document.getElementById('profile-display-name').textContent = profile.fullName || 'Campus User';
+    document.getElementById('profile-display-email').textContent = profile.email || this.currentUser.email;
+    document.getElementById('profile-avatar-circle').textContent = (profile.fullName || profile.email || 'CU').substring(0, 2).toUpperCase();
+
+    document.getElementById('profile-fullname').value = profile.fullName || '';
+    document.getElementById('profile-phone').value = profile.phone || '';
+    document.getElementById('profile-dept').value = profile.department || 'CSE';
+    document.getElementById('profile-batch').value = profile.batch || '2022-2026';
+    document.getElementById('profile-dob').value = profile.dob || '';
+    document.getElementById('profile-interests').value = profile.interests || 'AI, Machine Learning, Web Development, Robotics';
+    
+    const keyInput = document.getElementById('profile-groq-key');
+    const keyBadge = document.getElementById('api-key-status-badge');
+    const activeKey = profile.groqApiKey || localStorage.getItem('groq_api_key') || '';
+    keyInput.value = activeKey;
+
+    if (keyBadge) {
+      if (activeKey && activeKey.startsWith('gsk_')) {
+        keyBadge.textContent = 'Active Key Configured';
+        keyBadge.style.background = '#dcfce7';
+        keyBadge.style.color = '#15803d';
+      } else {
+        keyBadge.textContent = 'No Custom Key Set (System Default)';
+        keyBadge.style.background = '#fef3c7';
+        keyBadge.style.color = '#b45309';
+      }
+    }
+
+    this.openModal('profile-modal');
+  }
+
+  async handleSaveUserProfile(e) {
+    e.preventDefault();
+    if (!this.currentUser) return;
+
+    const fullName = document.getElementById('profile-fullname').value.trim();
+    const phone = document.getElementById('profile-phone').value.trim();
+    const dept = document.getElementById('profile-dept').value;
+    const batch = document.getElementById('profile-batch').value.trim();
+    const dob = document.getElementById('profile-dob').value;
+    const interests = document.getElementById('profile-interests').value.trim();
+    const groqKey = document.getElementById('profile-groq-key').value.trim();
+
+    const updatedProfile = {
+      uid: this.currentUser.uid,
+      email: this.currentUser.email,
+      fullName: fullName || 'Campus User',
+      phone,
+      department: dept,
+      batch,
+      dob,
+      interests,
+      groqApiKey: groqKey,
+      updatedAt: firebase.firestore.FieldValue ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString()
+    };
+
+    this.userProfile = updatedProfile;
+    localStorage.setItem('campuspulse_user_profile', JSON.stringify(updatedProfile));
+    if (groqKey) {
+      localStorage.setItem('groq_api_key', groqKey);
+    } else {
+      localStorage.removeItem('groq_api_key');
+    }
+
+    if (this.db) {
+      try {
+        await this.db.collection('users').doc(this.currentUser.uid).set(updatedProfile, { merge: true });
+        console.log("Updated user profile in Firestore:", this.currentUser.uid);
+      } catch (err) {
+        console.warn("Firestore user profile save warning:", err);
+      }
+    }
+
+    this.updateUserUI();
+    this.renderEvents();
+    this.closeModal('profile-modal');
+    this.triggerToastNotification('Profile & API Settings Saved! 💾', 'Your profile and Groq API Key have been securely updated in database!');
+  }
+
+  // --- AI RECOMMENDATION AGENT UTILITY ---
+  runRecommendationAgent(event) {
+    if (!this.userProfile) return { isRecommended: false };
+
+    const userDept = (this.userProfile.department || '').toUpperCase();
+    const userInterests = (this.userProfile.interests || '').toLowerCase().split(',').map(i => i.trim()).filter(Boolean);
+
+    // 1. Department match
+    const eventDepts = (event.departments || []).map(d => d.toUpperCase());
+    const matchesDept = userDept && (eventDepts.includes('ALL') || eventDepts.includes(userDept));
+
+    // 2. Keyword/Interest match against event title, shortDesc, fullDesc, techStack, type
+    const searchHaystack = `${event.title} ${event.shortDesc} ${event.fullDesc} ${event.type} ${(event.techStack || []).join(' ')}`.toLowerCase();
+    const matchesInterest = userInterests.some(interest => interest.length > 2 && searchHaystack.includes(interest));
+
+    if (matchesDept || matchesInterest) {
+      return {
+        isRecommended: true,
+        reason: matchesDept && matchesInterest ? 'Matches your Department & Interests' : (matchesDept ? 'Targeted for your Department' : 'Matches your Academic Interests')
+      };
+    }
+    return { isRecommended: false };
+  }
+
+  toggleEventHistoryView() {
+    this.switchDirectory('history');
+  }
+
+  handleGroqApiError(err) {
+    console.warn("Groq API Key Quota / Rate Limit Error detected:", err);
+    if (this.userProfile && this.userProfile.groqApiKey) {
+      this.userProfile.groqApiKey = '';
+    }
+    localStorage.removeItem('groq_api_key');
+    if (this.db && this.currentUser) {
+      this.db.collection('users').doc(this.currentUser.uid).set({ groqApiKey: '' }, { merge: true }).catch(() => {});
+    }
+
+    this.triggerToastNotification(
+      '⚠️ Groq API Key Rate-Limited or Invalid',
+      'Your Groq API key threw a quota/limit error. It has been auto-flagged. Please open Profile Settings to provide a fresh key.'
+    );
+  }
+
   // --- DUAL DIRECTORY SWITCHER METHOD ---
   switchDirectory(directory) {
     this.activeDirectory = directory;
 
     const tabEvents = document.getElementById('tab-dir-events');
     const tabProjects = document.getElementById('tab-dir-projects');
+    const tabHistory = document.getElementById('tab-dir-history');
     if (tabEvents) tabEvents.classList.toggle('active', directory === 'events');
     if (tabProjects) tabProjects.classList.toggle('active', directory === 'projects');
+    if (tabHistory) tabHistory.classList.toggle('active', directory === 'history');
 
     const titleEl = document.getElementById('page-directory-title');
     const subEl = document.getElementById('page-directory-sub');
@@ -552,12 +744,18 @@ class App {
       if (statusSelectContainer) statusSelectContainer.style.display = 'block';
       if (dateFilterGroup) dateFilterGroup.style.display = 'flex';
       if (legendBar) legendBar.style.display = 'flex';
-    } else {
+    } else if (directory === 'projects') {
       if (titleEl) titleEl.textContent = 'Projects, Research & Innovations Showcase';
       if (subEl) subEl.textContent = 'Explore student capstones, hardware prototypes, and faculty research papers';
       if (statusSelectContainer) statusSelectContainer.style.display = 'none';
       if (dateFilterGroup) dateFilterGroup.style.display = 'none';
       if (legendBar) legendBar.style.display = 'none';
+    } else if (directory === 'history') {
+      if (titleEl) titleEl.textContent = '📜 Historical Events & Past Competitions Archive';
+      if (subEl) subEl.textContent = 'Searchable chronological archive of past, closed, and ended campus events';
+      if (statusSelectContainer) statusSelectContainer.style.display = 'none';
+      if (dateFilterGroup) dateFilterGroup.style.display = 'flex';
+      if (legendBar) legendBar.style.display = 'flex';
     }
 
     this.renderEvents();
@@ -587,20 +785,31 @@ class App {
 
     if (!gridContainer || !resultsCount) return;
 
-    const searchQuery = document.getElementById('search-input').value.toLowerCase().trim();
-    const deptFilter = document.getElementById('dept-select').value || this.activeDeptFilter;
+    const searchQuery = document.getElementById('search-input')?.value.toLowerCase().trim() || '';
+    const deptFilter = document.getElementById('dept-select')?.value || this.activeDeptFilter;
+    const categoryFilter = document.getElementById('category-select')?.value || '';
     const statusFilter = document.getElementById('status-select')?.value;
     const singleDate = document.getElementById('date-single')?.value;
     const dateFrom = document.getElementById('date-from')?.value;
     const dateTo = document.getElementById('date-to')?.value;
 
-    const filtered = this.events.filter(event => {
-      // 1. Dual Directory Filter (events vs projects)
-      const itemDir = event.directory || (event.type === 'Project' || event.type === 'Research' ? 'projects' : 'events');
-      if (itemDir !== this.activeDirectory) return false;
-
+    let filtered = this.events.filter(event => {
       const statusInfo = this.evaluateEventStatus(event);
 
+      // 1. Directory Filter (events vs projects vs history)
+      if (this.activeDirectory === 'history') {
+        const itemDir = event.directory || (event.type === 'Project' || event.type === 'Research' ? 'projects' : 'events');
+        if (itemDir === 'projects') return false; // History archives past events & competitions
+        if (statusInfo.code !== 'CLOSED' && statusInfo.code !== 'ENDED') return false;
+      } else if (this.activeDirectory === 'projects') {
+        const itemDir = event.directory || (event.type === 'Project' || event.type === 'Research' ? 'projects' : 'events');
+        if (itemDir !== 'projects') return false;
+      } else {
+        const itemDir = event.directory || (event.type === 'Project' || event.type === 'Research' ? 'projects' : 'events');
+        if (itemDir !== 'events') return false;
+      }
+
+      // 2. Search Query Filter
       if (searchQuery) {
         const matchesTitle = event.title.toLowerCase().includes(searchQuery);
         const matchesShortDesc = event.shortDesc.toLowerCase().includes(searchQuery);
@@ -609,12 +818,24 @@ class App {
         if (!matchesTitle && !matchesShortDesc && !matchesCategory && !matchesTech) return false;
       }
 
+      // 3. Department Filter
       if (deptFilter) {
         const includesDept = event.departments.includes('All') || event.departments.includes(deptFilter);
         if (!includesDept) return false;
       }
 
-      if (this.activeDirectory === 'events') {
+      // 4. Category / Type Filter (Hackathon, Symposium, Quiz, Workshop, Seminar, Project, Research, Others)
+      if (categoryFilter) {
+        if (categoryFilter === 'Others') {
+          const standardTypes = ['Symposium', 'Hackathon', 'Quiz', 'Workshop', 'Seminar', 'Project', 'Research'];
+          if (standardTypes.includes(event.type)) return false;
+        } else {
+          if (event.type !== categoryFilter) return false;
+        }
+      }
+
+      // 5. Status & Date Range Filters (Events & History views)
+      if (this.activeDirectory === 'events' || this.activeDirectory === 'history') {
         if (statusFilter && statusInfo.code !== statusFilter) return false;
 
         if (singleDate) {
@@ -639,7 +860,12 @@ class App {
       return true;
     });
 
-    const unitName = this.activeDirectory === 'events' ? 'event' : 'project';
+    // Sort history view chronologically by timestamp (newest ended first)
+    if (this.activeDirectory === 'history') {
+      filtered.sort((a, b) => new Date(b.eventEnd || b.createdAt || 0) - new Date(a.eventEnd || a.createdAt || 0));
+    }
+
+    const unitName = this.activeDirectory === 'events' ? 'event' : (this.activeDirectory === 'history' ? 'historical event' : 'project');
     resultsCount.textContent = `Showing ${filtered.length} ${unitName}${filtered.length === 1 ? '' : 's'}`;
 
     if (filtered.length === 0) {
@@ -647,7 +873,7 @@ class App {
         <div class="empty-state">
           <div class="empty-state-icon"><i class="fa-regular fa-folder-open"></i></div>
           <h3>No ${unitName}s match your criteria</h3>
-          <p>Try adjusting your search terms, department filters, or switch directories.</p>
+          <p>Try adjusting your search terms, department filters, or category selections.</p>
           <button class="btn-primary" onclick="app.resetFilters()">Reset All Filters</button>
         </div>
       `;
@@ -659,17 +885,30 @@ class App {
       const posterImg = this.sanitizeGoogleDriveUrl(event.posterUrl);
       const deptsHtml = event.departments.map(d => `<span class="dept-tag">${this.escapeHTML(d)}</span>`).join('');
 
+      // Run AI Agent Smart Recommendation Matching
+      const recResult = this.runRecommendationAgent(event);
+      const isRecommended = recResult.isRecommended;
+      const recGlowClass = isRecommended ? 'glowing-recommended-border' : '';
+      const recBadgeHtml = isRecommended ? `
+        <span class="badge-recommended" title="${this.escapeHTML(recResult.reason)}">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Recommended For You
+        </span>
+      ` : '';
+
       if (this.activeDirectory === 'projects') {
         const techHtml = (event.techStack || []).map(t => `<span class="tech-chip">${this.escapeHTML(t)}</span>`).join('');
         const badgeClass = event.type === 'Research' ? 'research' : 'project';
         const badgeLabel = event.type === 'Research' ? '🔬 Research Paper' : '💡 Student Project';
 
         return `
-          <div class="event-card" style="border:1px solid #e2e8f0;" onclick="app.openDetailModal('${this.escapeHTML(event.id)}')">
+          <div class="event-card ${recGlowClass}" style="border:1px solid #e2e8f0;" onclick="app.openDetailModal('${this.escapeHTML(event.id)}')">
             <div class="card-header-image">
               <img src="${posterImg}" alt="${this.escapeHTML(event.title)}" onerror="this.src='https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80'">
               <span class="card-type-badge">${this.escapeHTML(event.type)}</span>
-              <span class="card-status-badge ${badgeClass}">${badgeLabel}</span>
+              <div style="position:absolute; top:0.75rem; right:0.75rem; display:flex; flex-direction:column; align-items:flex-end; gap:0.35rem;">
+                <span class="card-status-badge ${badgeClass}">${badgeLabel}</span>
+                ${recBadgeHtml}
+              </div>
             </div>
             <div class="card-body">
               <h3 class="card-title">${this.escapeHTML(event.title)}</h3>
@@ -695,12 +934,22 @@ class App {
           month: 'short', day: 'numeric', year: 'numeric'
         }) : 'TBA';
 
+        const isLinkDisabled = statusInfo.code === 'CLOSED' || statusInfo.code === 'ENDED';
+        const linkNoticeHtml = isLinkDisabled ? `
+          <div style="margin-top:0.5rem; font-size:0.725rem; font-weight:700; color:#ef4444; display:flex; align-items:center; gap:0.3rem;">
+            <i class="fa-solid fa-lock"></i> Registration Closed
+          </div>
+        ` : '';
+
         return `
-          <div class="event-card ${statusInfo.cardBorder}" onclick="app.openDetailModal('${this.escapeHTML(event.id)}')">
+          <div class="event-card ${statusInfo.cardBorder} ${recGlowClass}" onclick="app.openDetailModal('${this.escapeHTML(event.id)}')">
             <div class="card-header-image">
               <img src="${posterImg}" alt="${this.escapeHTML(event.title)}" onerror="this.src='https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80'">
               <span class="card-type-badge">${this.escapeHTML(event.type)}</span>
-              <span class="card-status-badge ${statusInfo.class}">${statusInfo.label}</span>
+              <div style="position:absolute; top:0.75rem; right:0.75rem; display:flex; flex-direction:column; align-items:flex-end; gap:0.35rem;">
+                <span class="card-status-badge ${statusInfo.class}">${statusInfo.label}</span>
+                ${recBadgeHtml}
+              </div>
             </div>
             <div class="card-body">
               <h3 class="card-title">${this.escapeHTML(event.title)}</h3>
@@ -716,6 +965,7 @@ class App {
                 <div class="card-dept-tags">
                   ${deptsHtml}
                 </div>
+                ${linkNoticeHtml}
               </div>
             </div>
           </div>
@@ -1342,8 +1592,27 @@ Output pure JSON with no markdown formatting or commentary.`;
     document.getElementById('modal-detail-rules').textContent = event.rules || (isProject ? 'Open-source campus project guidelines apply.' : 'Standard rules apply.');
     
     const regBtn = document.getElementById('modal-detail-reg-btn');
-    regBtn.href = event.regLink;
-    regBtn.innerHTML = isProject ? '<i class="fa-brands fa-github"></i> View Repository / Demo' : '<i class="fa-solid fa-paper-plane"></i> Register Now';
+    const statusInfo = isProject ? { code: 'OPEN' } : this.evaluateEventStatus(event);
+    const isLinkDisabled = !isProject && (statusInfo.code === 'CLOSED' || statusInfo.code === 'ENDED');
+
+    if (isLinkDisabled) {
+      regBtn.href = 'javascript:void(0)';
+      regBtn.classList.add('disabled');
+      regBtn.removeAttribute('target');
+      regBtn.onclick = (e) => {
+        e.preventDefault();
+        alert('⚠️ Registration Closed: Registration for this event has closed or the event has ended.');
+      };
+      regBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Registration Closed';
+      regBtn.title = 'Registration is closed or event has ended';
+    } else {
+      regBtn.href = event.regLink;
+      regBtn.classList.remove('disabled');
+      regBtn.target = '_blank';
+      regBtn.onclick = null;
+      regBtn.innerHTML = isProject ? '<i class="fa-brands fa-github"></i> View Repository / Demo' : '<i class="fa-solid fa-paper-plane"></i> Register Now';
+      regBtn.title = 'Click to open registration link';
+    }
 
     this.openModal('detail-modal');
   }
@@ -1662,15 +1931,15 @@ _Published via CampusPulse_`;
   }
 
   getGroqApiKey() {
-    const envKey = window.ENV?.GROQ_API_KEY;
-    if (envKey && envKey.startsWith('gsk_') && !envKey.includes('xxxx')) {
-      return envKey;
+    if (this.userProfile && this.userProfile.groqApiKey && this.userProfile.groqApiKey.startsWith('gsk_')) {
+      return this.userProfile.groqApiKey;
     }
     const localKey = localStorage.getItem('groq_api_key');
     if (localKey && localKey.startsWith('gsk_') && !localKey.includes('xxxx')) {
       return localKey;
     }
-    if (envKey && envKey.startsWith('gsk_')) {
+    const envKey = window.ENV?.GROQ_API_KEY;
+    if (envKey && envKey.startsWith('gsk_') && !envKey.includes('xxxx')) {
       return envKey;
     }
     return '';
@@ -1702,6 +1971,14 @@ _Published via CampusPulse_`;
           })
         });
 
+        if (response.status === 429 || response.status === 401) {
+          const errData = await response.json().catch(() => ({}));
+          const errMsg = errData.error?.message || `Groq API Error HTTP ${response.status}`;
+          const errObj = new Error(errMsg);
+          this.handleGroqApiError(errObj);
+          throw errObj;
+        }
+
         const data = await response.json();
         if (data.choices && data.choices[0] && data.choices[0].message) {
           return data.choices[0].message.content;
@@ -1710,16 +1987,16 @@ _Published via CampusPulse_`;
           lastError = new Error(data.error.message || 'Groq API error');
 
           const errMsg = (data.error.message || '').toLowerCase();
-          if (errMsg.includes('invalid api key') || errMsg.includes('unauthorized') || errMsg.includes('incorrect api key')) {
-            throw new Error('Invalid Groq API key. Please check your key in .env or env.js.');
+          if (errMsg.includes('rate limit') || errMsg.includes('quota') || errMsg.includes('invalid api key') || errMsg.includes('unauthorized')) {
+            this.handleGroqApiError(lastError);
+            throw lastError;
           }
 
-          // Continue trying next active model for any model error/decommissioned/limit
           continue;
         }
       } catch (err) {
         lastError = err;
-        if (err.message && (err.message.includes('Invalid Groq API key') || err.message.includes('unauthorized'))) {
+        if (err.message && (err.message.includes('Invalid Groq API key') || err.message.includes('unauthorized') || err.message.includes('Rate-Limited'))) {
           throw err;
         }
         console.warn(`Attempt with Groq model ${model} failed:`, err.message);
