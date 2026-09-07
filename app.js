@@ -141,6 +141,19 @@ class App {
 
     this.initFirebase();
     this.initServiceWorker();
+
+    // Cross-tab real-time sync listener for instant event updates between Admin and Dashboard
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'campuspulse_events') {
+        const stored = localStorage.getItem('campuspulse_events');
+        if (stored) {
+          try {
+            this.events = JSON.parse(stored);
+            this.renderEvents();
+          } catch (err) {}
+        }
+      }
+    });
   }
 
   initServiceWorker() {
@@ -855,7 +868,8 @@ class App {
       const statusInfo = this.evaluateEventStatus(event);
 
       // 0. Admin Approval Filter: Only show approved events on the public dashboard (or legacy seeds with no status)
-      if (event.approvalStatus && event.approvalStatus !== 'approved') {
+      const appStatus = (event.approvalStatus || 'approved').toLowerCase();
+      if (appStatus !== 'approved') {
         return false;
       }
 
