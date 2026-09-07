@@ -278,6 +278,22 @@
           </div>
         </div>
 
+        <!-- PERSONALIZED "FOR YOU" & DEPARTMENT FILTER PILLS BAR -->
+        <div class="dept-pills-container">
+          <button class="dept-pill-btn btn-for-you" id="pill-for-you" onclick="app.toggleForYouFilter()" title="Filter events personalized specifically for your interests and department">
+            <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> ✨ For You
+          </button>
+          <span class="h-4 w-px bg-slate-300 mx-1"></span>
+          <button class="dept-pill-btn active" id="pill-dept-all" onclick="app.filterByDeptPill('')">All</button>
+          <button class="dept-pill-btn" id="pill-dept-cse" onclick="app.filterByDeptPill('CSE')">CSE</button>
+          <button class="dept-pill-btn" id="pill-dept-ece" onclick="app.filterByDeptPill('ECE')">ECE</button>
+          <button class="dept-pill-btn" id="pill-dept-it" onclick="app.filterByDeptPill('IT')">IT</button>
+          <button class="dept-pill-btn" id="pill-dept-aids" onclick="app.filterByDeptPill('AIDS')">AIDS</button>
+          <button class="dept-pill-btn" id="pill-dept-eee" onclick="app.filterByDeptPill('EEE')">EEE</button>
+          <button class="dept-pill-btn" id="pill-dept-mech" onclick="app.filterByDeptPill('MECH')">MECH</button>
+          <button class="dept-pill-btn" id="pill-dept-others" onclick="app.filterByDeptPill('Others')">Others</button>
+        </div>
+
         <!-- SEARCH & ADVANCED MULTI-FILTER CONTROL PANEL -->
         <div class="filter-control-panel">
           <div class="search-input-wrapper">

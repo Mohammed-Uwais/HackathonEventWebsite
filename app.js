@@ -114,6 +114,7 @@ class App {
     this.userProfile = null;
     this.activeDirectory = 'events'; // Switcher state: 'events', 'projects', 'history'
     this.activeDeptFilter = '';
+    this.isForYouOnlyFilter = false;
     this.selectedEventId = null;
     this.otpState = { email: '', code: '' };
     this.publishMode = 'manual';
@@ -867,6 +868,12 @@ class App {
     let filtered = this.events.filter(event => {
       const statusInfo = this.evaluateEventStatus(event);
 
+      // 0. Personalized "For You" Interest Filter Tag
+      if (this.isForYouOnlyFilter) {
+        const recResult = this.runRecommendationAgent(event);
+        if (!recResult.isRecommended) return false;
+      }
+
       // 1. Directory Filter (events vs projects vs history)
       if (this.activeDirectory === 'history') {
         const itemDir = event.directory || (event.type === 'Project' || event.type === 'Research' ? 'projects' : 'events');
@@ -1126,13 +1133,65 @@ class App {
   }
 
   resetFilters() {
-    document.getElementById('search-input').value = '';
-    document.getElementById('dept-select').value = '';
-    document.getElementById('status-select').value = '';
-    document.getElementById('date-single').value = '';
-    document.getElementById('date-from').value = '';
-    document.getElementById('date-to').value = '';
-    this.setDeptFilter('');
+    this.isForYouOnlyFilter = false;
+    this.activeDeptFilter = '';
+
+    const forYouBtn = document.getElementById('pill-for-you');
+    if (forYouBtn) forYouBtn.classList.remove('active');
+
+    const deptPills = document.querySelectorAll('.dept-pill-btn:not(#pill-for-you)');
+    deptPills.forEach(p => p.classList.remove('active'));
+
+    const allPill = document.getElementById('pill-dept-all');
+    if (allPill) allPill.classList.add('active');
+
+    if (document.getElementById('search-input')) document.getElementById('search-input').value = '';
+    if (document.getElementById('dept-select')) document.getElementById('dept-select').value = '';
+    if (document.getElementById('category-select')) document.getElementById('category-select').value = '';
+    if (document.getElementById('status-select')) document.getElementById('status-select').value = '';
+    if (document.getElementById('date-single')) document.getElementById('date-single').value = '';
+    if (document.getElementById('date-from')) document.getElementById('date-from').value = '';
+    if (document.getElementById('date-to')) document.getElementById('date-to').value = '';
+
+    this.renderEvents();
+  }
+
+  // --- PERSONALIZED "FOR YOU" & DEPARTMENT PILL FILTER HANDLERS ---
+  toggleForYouFilter() {
+    this.isForYouOnlyFilter = !this.isForYouOnlyFilter;
+    const forYouBtn = document.getElementById('pill-for-you');
+
+    if (this.isForYouOnlyFilter) {
+      if (forYouBtn) forYouBtn.classList.add('active');
+      const deptPills = document.querySelectorAll('.dept-pill-btn:not(#pill-for-you)');
+      deptPills.forEach(p => p.classList.remove('active'));
+    } else {
+      if (forYouBtn) forYouBtn.classList.remove('active');
+      const allPill = document.getElementById('pill-dept-all');
+      if (allPill) allPill.classList.add('active');
+    }
+
+    this.renderEvents();
+  }
+
+  filterByDeptPill(dept) {
+    this.isForYouOnlyFilter = false;
+    this.activeDeptFilter = dept;
+
+    const forYouBtn = document.getElementById('pill-for-you');
+    if (forYouBtn) forYouBtn.classList.remove('active');
+
+    const selectEl = document.getElementById('dept-select');
+    if (selectEl) selectEl.value = dept;
+
+    const deptPills = document.querySelectorAll('.dept-pill-btn:not(#pill-for-you)');
+    deptPills.forEach(p => p.classList.remove('active'));
+
+    const targetId = dept ? `pill-dept-${dept.toLowerCase()}` : 'pill-dept-all';
+    const targetPill = document.getElementById(targetId);
+    if (targetPill) targetPill.classList.add('active');
+
+    this.renderEvents();
   }
 
   updateUserUI() {
@@ -1331,10 +1390,20 @@ class App {
 
   toggleNotifDrawer() {
     const drawer = document.getElementById('notif-drawer');
+    const bellBtn = document.getElementById('btn-notification-bell');
     if (drawer) {
       const isActive = drawer.classList.toggle('active');
       if (isActive) {
         this.markNotificationsAsRead();
+
+        // One-time outside click listener to close drawer gracefully
+        const closeOnOutsideClick = (e) => {
+          if (!drawer.contains(e.target) && !bellBtn?.contains(e.target)) {
+            drawer.classList.remove('active');
+            document.removeEventListener('click', closeOnOutsideClick);
+          }
+        };
+        setTimeout(() => document.addEventListener('click', closeOnOutsideClick), 10);
       }
     }
   }
