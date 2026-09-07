@@ -1646,13 +1646,35 @@ class App {
     if (previewState) previewState.style.display = 'none';
   }
 
+  async runInBrowserImageOcr(imageBase64) {
+    if (!window.Tesseract) return null;
+    try {
+      this.triggerToastNotification('🤖 In-Browser AI OCR Agent', 'Scanning image pixels for text & event details...');
+      const result = await Tesseract.recognize(imageBase64, 'eng');
+      return result && result.data && result.data.text ? result.data.text.trim() : null;
+    } catch (ocrErr) {
+      console.warn("In-browser Tesseract OCR scanner error:", ocrErr);
+      return null;
+    }
+  }
+
   async parseMultimodalWithGroq() {
-    const rawText = document.getElementById('ai-raw-prompt').value.trim();
+    let rawText = document.getElementById('ai-raw-prompt').value.trim();
     const hasImage = !!this.aiPosterBase64;
 
     if (!rawText && !hasImage) {
       alert('Please paste announcement text or upload an event poster image.');
       return;
+    }
+
+    // Run Client-Side AI OCR Agent on uploaded poster image
+    let ocrExtractedText = '';
+    if (hasImage) {
+      ocrExtractedText = await this.runInBrowserImageOcr(this.aiPosterBase64);
+      if (ocrExtractedText) {
+        console.log("In-browser AI OCR Extracted Text:\n", ocrExtractedText);
+        rawText = rawText ? `${rawText}\n\n[OCR Extracted Text from Poster Image]:\n${ocrExtractedText}` : ocrExtractedText;
+      }
     }
 
     this.triggerToastNotification(
@@ -1729,15 +1751,15 @@ Output pure JSON with no markdown formatting or commentary.`;
           const posterUrlMatch = rawText.match(/(?:Poster Image URL|Poster URL|Image URL):\s*(https?:\/\/[^\s]+)/i);
           if (posterUrlMatch) extractedPosterUrl = posterUrlMatch[1];
 
-          const regLinkMatch = rawText.match(/(?:Registration Link|Reg Link|Form Link):\s*(https?:\/\/[^\s]+)/i);
+          const regLinkMatch = rawText.match(/(?:Registration Link|Reg Link|Form Link|https:\/\/forms[^\s]+|https:\/\/[^\s]+registration[^\s]*):\s*([^\s]+)/i) || rawText.match(/(https?:\/\/[^\s]+)/i);
           if (regLinkMatch) extractedRegLink = regLinkMatch[1];
 
           const titleMatch = rawText.match(/(?:Event Title|Title|Name):\s*([^\n]+)/i);
           if (titleMatch) {
             extractedTitle = titleMatch[1].trim();
           } else {
-            const firstLine = rawText.split('\n')[0].replace(/(?:Poster Image URL|Registration Link|Reg Link):.*$/i, '').trim();
-            if (firstLine && firstLine.length < 80) extractedTitle = firstLine;
+            const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 3 && !l.includes('http'));
+            if (lines.length > 0 && lines[0].length < 80) extractedTitle = lines[0];
           }
         }
 
