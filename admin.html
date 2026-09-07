@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="CampusPulse Admin Publishing Portal - Manage, accept, or decline event submissions before publishing to the campus discovery dashboard.">
+  <meta name="description" content="CampusPulse Admin Publishing Portal - Secured Admin Moderation Console.">
   <title>Admin Publishing Portal | CampusPulse</title>
 
   <!-- Tailwind CSS CDN for Enterprise SaaS UI -->
@@ -35,125 +35,191 @@
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
 
-  <!-- ADMIN TOP NAVBAR HEADER -->
-  <header class="bg-[#0f172a] text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 bg-amber-500 text-slate-950 rounded-xl flex items-center justify-center font-black text-lg shadow-sm">
+  <!-- ==========================================================================
+       1. MANDATORY ADMIN AUTHORIZATION GATE SCREEN (LOCK SCREEN)
+       ========================================================================== -->
+  <div id="admin-gate-screen" class="fixed inset-0 z-50 bg-[#0f172a] flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-2xl p-8 flex flex-col gap-6">
+      
+      <!-- BRAND HEADER -->
+      <div class="text-center flex flex-col items-center gap-2">
+        <div class="w-14 h-14 bg-amber-500 text-slate-950 rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg">
           <i class="fa-solid fa-shield-halved"></i>
         </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <span class="font-extrabold text-base tracking-tight">CampusPulse</span>
-            <span class="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[10px] font-bold rounded border border-amber-500/30 uppercase tracking-wide">Admin Portal</span>
+        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Admin Authorization</h1>
+        <p class="text-xs text-slate-500">Restricted Access. Enter Admin ID & Password to moderate event publishing.</p>
+      </div>
+
+      <!-- ERROR ALERT -->
+      <div id="admin-gate-error" class="hidden p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold flex items-center gap-2">
+        <i class="fa-solid fa-triangle-exclamation text-rose-600 text-sm"></i>
+        <span id="admin-gate-error-text">Invalid Admin ID or Password. Access denied.</span>
+      </div>
+
+      <!-- ADMIN CREDENTIALS FORM -->
+      <form onsubmit="handleAdminGateLogin(event)" class="flex flex-col gap-4">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-slate-700">Admin ID / Email <span class="text-rose-500">*</span></label>
+          <div class="relative">
+            <i class="fa-solid fa-user-gear absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            <input type="text" id="gate-admin-id" placeholder="admin@campuspulse.edu" class="w-full pl-9 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition" required>
           </div>
-          <p class="text-[11px] text-slate-400">Event & Project Moderation Publishing Console</p>
         </div>
-      </div>
 
-      <div class="flex items-center gap-3">
-        <a href="index.html" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-semibold border border-slate-700 transition flex items-center gap-2">
-          <i class="fa-solid fa-globe text-blue-400"></i> Student Discovery Site
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-slate-700">Admin Passcode / Key <span class="text-rose-500">*</span></label>
+          <div class="relative">
+            <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            <input type="password" id="gate-admin-pass" placeholder="••••••••" class="w-full pl-9 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition" required>
+          </div>
+        </div>
+
+        <!-- HINT BOX FOR TESTING -->
+        <div class="p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl text-[11px] text-amber-900 flex items-start gap-2">
+          <i class="fa-solid fa-circle-info text-amber-600 mt-0.5"></i>
+          <div>
+            <strong>Admin Credentials:</strong><br>
+            Admin ID: <code class="bg-amber-100 px-1 rounded">admin@campuspulse.edu</code> (or <code class="bg-amber-100 px-1 rounded">admin</code>)<br>
+            Password: <code class="bg-amber-100 px-1 rounded">admin123</code>
+          </div>
+        </div>
+
+        <button type="submit" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-sm rounded-lg shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-key"></i> Authorize & Access Admin Dashboard
+        </button>
+
+        <a href="index.html" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg transition text-center text-decoration-none">
+          <i class="fa-solid fa-arrow-left mr-1"></i> Return to Student Discovery Site
         </a>
-        <button id="btn-admin-auth" onclick="toggleAdminAuth()" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-bold transition flex items-center gap-2 shadow">
-          <i class="fa-solid fa-user-shield"></i> <span id="admin-auth-text">Admin Verified</span>
-        </button>
-      </div>
+      </form>
     </div>
-  </header>
+  </div>
 
-  <!-- MAIN ADMIN WORKSPACE -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-8">
+  <!-- ==========================================================================
+       2. SECURED MAIN ADMIN DASHBOARD WORKSPACE (HIDDEN UNTIL AUTHORIZED)
+       ========================================================================== -->
+  <div id="admin-dashboard-container" class="hidden flex-col min-h-screen">
     
-    <!-- PAGE TITLE BANNER -->
-    <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-6 text-white border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-extrabold tracking-tight flex items-center gap-2">
-          <i class="fa-solid fa-list-check text-amber-400"></i> Event Submission & Moderation
-        </h1>
-        <p class="text-xs text-slate-300 mt-1 max-w-2xl">
-          Review student and organizer event submissions. Accept submissions to publish them directly to the public discovery dashboard, or decline submissions to keep event details hidden.
-        </p>
-      </div>
+    <!-- ADMIN TOP NAVBAR HEADER -->
+    <header class="bg-[#0f172a] text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-amber-500 text-slate-950 rounded-xl flex items-center justify-center font-black text-lg shadow-sm">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-extrabold text-base tracking-tight">CampusPulse</span>
+              <span class="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[10px] font-bold rounded border border-amber-500/30 uppercase tracking-wide">Admin Portal</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Event & Project Moderation Publishing Console</p>
+          </div>
+        </div>
 
-      <div class="flex items-center gap-2 bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-700 text-xs">
-        <i class="fa-solid fa-bolt text-amber-400"></i>
-        <span>Workflow: <strong>User Submits</strong> &rarr; <strong>Admin Reviews</strong> &rarr; <strong>Accept/Decline</strong></span>
+        <div class="flex items-center gap-3">
+          <a href="index.html" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-semibold border border-slate-700 transition flex items-center gap-2">
+            <i class="fa-solid fa-globe text-blue-400"></i> Student Discovery Site
+          </a>
+          <button onclick="lockAdminPortal()" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-2 shadow">
+            <i class="fa-solid fa-lock"></i> Lock / Logout
+          </button>
+        </div>
       </div>
-    </div>
+    </header>
 
-    <!-- METRICS CARDS -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+    <!-- MAIN ADMIN WORKSPACE -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-8">
+      
+      <!-- PAGE TITLE BANNER -->
+      <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-6 text-white border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Review</p>
-          <h3 class="text-2xl font-black text-amber-600 mt-1" id="stat-pending-count">0</h3>
+          <h1 class="text-2xl font-extrabold tracking-tight flex items-center gap-2">
+            <i class="fa-solid fa-list-check text-amber-400"></i> Event Submission & Moderation
+          </h1>
+          <p class="text-xs text-slate-300 mt-1 max-w-2xl">
+            Review student and organizer event submissions. Accept submissions to publish them directly to the public discovery dashboard, or decline submissions to keep event details hidden.
+          </p>
         </div>
-        <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl font-bold border border-amber-200">
-          <i class="fa-solid fa-hourglass-half"></i>
+
+        <div class="flex items-center gap-2 bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-700 text-xs">
+          <i class="fa-solid fa-bolt text-amber-400"></i>
+          <span>Workflow: <strong>User Submits</strong> &rarr; <strong>Admin Reviews</strong> &rarr; <strong>Accept/Decline</strong></span>
         </div>
       </div>
 
-      <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
-        <div>
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Approved & Live</p>
-          <h3 class="text-2xl font-black text-emerald-600 mt-1" id="stat-approved-count">0</h3>
+      <!-- METRICS CARDS -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Review</p>
+            <h3 class="text-2xl font-black text-amber-600 mt-1" id="stat-pending-count">0</h3>
+          </div>
+          <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl font-bold border border-amber-200">
+            <i class="fa-solid fa-hourglass-half"></i>
+          </div>
         </div>
-        <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl font-bold border border-emerald-200">
-          <i class="fa-solid fa-circle-check"></i>
+
+        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Approved & Live</p>
+            <h3 class="text-2xl font-black text-emerald-600 mt-1" id="stat-approved-count">0</h3>
+          </div>
+          <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl font-bold border border-emerald-200">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Declined Submissions</p>
+            <h3 class="text-2xl font-black text-rose-600 mt-1" id="stat-declined-count">0</h3>
+          </div>
+          <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center text-xl font-bold border border-rose-200">
+            <i class="fa-solid fa-circle-xmark"></i>
+          </div>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Submissions</p>
+            <h3 class="text-2xl font-black text-blue-600 mt-1" id="stat-total-count">0</h3>
+          </div>
+          <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl font-bold border border-blue-200">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
         </div>
       </div>
 
-      <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
-        <div>
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Declined Submissions</p>
-          <h3 class="text-2xl font-black text-rose-600 mt-1" id="stat-declined-count">0</h3>
+      <!-- TAB FILTER & CONTROLS BAR -->
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+          <button onclick="setAdminTab('pending')" id="tab-pending" class="px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-2 bg-amber-50 text-amber-700 border-amber-300 shadow-sm">
+            <i class="fa-solid fa-clock"></i> Pending Approvals (<span id="tab-pending-num">0</span>)
+          </button>
+          <button onclick="setAdminTab('approved')" id="tab-approved" class="px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-2 bg-white text-slate-600 border-slate-200 hover:bg-slate-100">
+            <i class="fa-solid fa-circle-check text-emerald-600"></i> Approved & Live (<span id="tab-approved-num">0</span>)
+          </button>
+          <button onclick="setAdminTab('declined')" id="tab-declined" class="px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-2 bg-white text-slate-600 border-slate-200 hover:bg-slate-100">
+            <i class="fa-solid fa-circle-xmark text-rose-600"></i> Declined (<span id="tab-declined-num">0</span>)
+          </button>
+          <button onclick="setAdminTab('all')" id="tab-all" class="px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-2 bg-white text-slate-600 border-slate-200 hover:bg-slate-100">
+            <i class="fa-solid fa-list"></i> All Submissions (<span id="tab-all-num">0</span>)
+          </button>
         </div>
-        <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center text-xl font-bold border border-rose-200">
-          <i class="fa-solid fa-circle-xmark"></i>
+
+        <div class="relative min-w-[240px]">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input type="text" id="admin-search-input" onkeyup="renderAdminList()" placeholder="Filter by title, email..." class="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-blue-600 transition">
         </div>
       </div>
 
-      <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
-        <div>
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Submissions</p>
-          <h3 class="text-2xl font-black text-blue-600 mt-1" id="stat-total-count">0</h3>
-        </div>
-        <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl font-bold border border-blue-200">
-          <i class="fa-solid fa-layer-group"></i>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB FILTER & CONTROLS BAR -->
-    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-      <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-        <button onclick="setAdminTab('pending')" id="tab-pending" class="px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-2 bg-amber-50 text-amber-700 border-amber-300 shadow-sm">
-          <i class="fa-solid fa-clock"></i> Pending Approvals (<span id="tab-pending-num">0</span>)
-        </button>
-        <button onclick="setAdminTab('approved')" id="tab-approved" class="px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-2 bg-white text-slate-600 border-slate-200 hover:bg-slate-100">
-          <i class="fa-solid fa-circle-check text-emerald-600"></i> Approved & Live (<span id="tab-approved-num">0</span>)
-        </button>
-        <button onclick="setAdminTab('declined')" id="tab-declined" class="px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-2 bg-white text-slate-600 border-slate-200 hover:bg-slate-100">
-          <i class="fa-solid fa-circle-xmark text-rose-600"></i> Declined (<span id="tab-declined-num">0</span>)
-        </button>
-        <button onclick="setAdminTab('all')" id="tab-all" class="px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-2 bg-white text-slate-600 border-slate-200 hover:bg-slate-100">
-          <i class="fa-solid fa-list"></i> All Submissions (<span id="tab-all-num">0</span>)
-        </button>
+      <!-- SUBMISSIONS LIST CONTAINER -->
+      <div id="admin-submissions-grid" class="grid grid-cols-1 gap-4">
+        <!-- Dynamic Admin Cards rendered via JavaScript -->
       </div>
 
-      <div class="relative min-w-[240px]">
-        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-        <input type="text" id="admin-search-input" onkeyup="renderAdminList()" placeholder="Filter by title, email..." class="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-blue-600 transition">
-      </div>
-    </div>
-
-    <!-- SUBMISSIONS LIST CONTAINER -->
-    <div id="admin-submissions-grid" class="grid grid-cols-1 gap-4">
-      <!-- Dynamic Admin Cards rendered via JavaScript -->
-    </div>
-
-  </main>
+    </main>
+  </div>
 
   <!-- TOAST NOTIFICATION CONTAINER -->
   <div id="admin-toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 ease-out bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-2xl border border-slate-800 flex items-center gap-3 max-w-md pointer-events-none">
@@ -164,44 +230,15 @@
     </div>
   </div>
 
-  <!-- ADMIN AUTH MODAL -->
-  <div id="admin-auth-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4">
-    <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-md w-full p-6 flex flex-col gap-5">
-      <div class="text-center flex flex-col items-center gap-2">
-        <div class="w-12 h-12 bg-amber-500 text-slate-950 rounded-xl flex items-center justify-center text-xl font-black shadow-md">
-          <i class="fa-solid fa-shield-halved"></i>
-        </div>
-        <h3 class="text-xl font-extrabold text-slate-900">Admin Authentication</h3>
-        <p class="text-xs text-slate-500">Enter Admin access credentials to verify moderation privileges.</p>
-      </div>
-
-      <form onsubmit="handleAdminLogin(event)" class="flex flex-col gap-4">
-        <div>
-          <label class="text-xs font-semibold text-slate-700">Admin Email</label>
-          <input type="email" id="admin-login-email" value="admin@campuspulse.edu" class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-amber-500 transition" required>
-        </div>
-        <div>
-          <label class="text-xs font-semibold text-slate-700">Passcode / Key</label>
-          <input type="password" id="admin-login-pass" value="admin123" class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-amber-500 transition" required>
-        </div>
-        
-        <button type="submit" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-sm rounded-lg shadow-md transition flex items-center justify-center gap-2">
-          <i class="fa-solid fa-key"></i> Verify & Access Admin Console
-        </button>
-
-        <button type="button" onclick="closeAdminAuthModal()" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg transition">
-          Continue as Guest Viewer
-        </button>
-      </form>
-    </div>
-  </div>
-
   <!-- ADMIN MODERATION SCRIPT -->
   <script>
+    // Configured Credentials
+    const VALID_ADMIN_IDS = ['admin@campuspulse.edu', 'admin@campus.edu', 'admin', 'admin@licet.ac.in'];
+    const VALID_ADMIN_PASSWORDS = ['admin123', 'admin'];
+
     // State Management
     let adminEvents = [];
     let activeTab = 'pending';
-    let isAdminVerified = true;
     let db = null;
 
     // Default Seed Fallback Events
@@ -238,12 +275,58 @@
       }
     ];
 
-    // Initialize Firebase and Data Stores
+    // Check authorization on DOM load
     window.addEventListener('DOMContentLoaded', () => {
+      checkAdminAuthOnLoad();
+    });
+
+    function checkAdminAuthOnLoad() {
+      const isAuth = sessionStorage.getItem('campuspulse_admin_auth') === 'true';
+      if (isAuth) {
+        showAdminDashboard();
+      } else {
+        showAdminGateScreen();
+      }
+    }
+
+    function showAdminGateScreen() {
+      document.getElementById('admin-gate-screen').style.display = 'flex';
+      document.getElementById('admin-dashboard-container').style.display = 'none';
+      document.getElementById('admin-dashboard-container').classList.add('hidden');
+    }
+
+    function showAdminDashboard() {
+      document.getElementById('admin-gate-screen').style.display = 'none';
+      document.getElementById('admin-dashboard-container').style.display = 'flex';
+      document.getElementById('admin-dashboard-container').classList.remove('hidden');
+
       loadEventsFromStorage();
       initFirebaseIfAvailable();
       renderAdminList();
-    });
+    }
+
+    function handleAdminGateLogin(e) {
+      e.preventDefault();
+      const adminId = document.getElementById('gate-admin-id').value.trim().toLowerCase();
+      const adminPass = document.getElementById('gate-admin-pass').value.trim();
+      const errorDiv = document.getElementById('admin-gate-error');
+
+      if (VALID_ADMIN_IDS.includes(adminId) && VALID_ADMIN_PASSWORDS.includes(adminPass)) {
+        sessionStorage.setItem('campuspulse_admin_auth', 'true');
+        errorDiv.classList.add('hidden');
+        showAdminDashboard();
+        showToast('✅ Admin Authorized', 'Welcome to CampusPulse Event Moderation Console.');
+      } else {
+        errorDiv.classList.remove('hidden');
+        document.getElementById('admin-gate-error-text').textContent = 'Invalid Admin ID or Password. Access denied.';
+      }
+    }
+
+    function lockAdminPortal() {
+      sessionStorage.removeItem('campuspulse_admin_auth');
+      showAdminGateScreen();
+      showToast('🔒 Admin Console Locked', 'Logged out of Admin Portal.');
+    }
 
     function loadEventsFromStorage() {
       const stored = localStorage.getItem('campuspulse_events');
@@ -422,6 +505,12 @@
     }
 
     async function acceptSubmission(eventId) {
+      if (sessionStorage.getItem('campuspulse_admin_auth') !== 'true') {
+        showToast('🔒 Access Denied', 'Admin authorization required.');
+        showAdminGateScreen();
+        return;
+      }
+
       const idx = adminEvents.findIndex(e => e.id === eventId);
       if (idx === -1) return;
 
@@ -444,11 +533,16 @@
       renderAdminList();
       showToast('🎉 Submission Accepted!', `"${event.title}" is now published and visible on the student dashboard.`);
 
-      // Optional Background Broadcast trigger
       sendBroadcastEmailIfPossible(event);
     }
 
     async function declineSubmission(eventId) {
+      if (sessionStorage.getItem('campuspulse_admin_auth') !== 'true') {
+        showToast('🔒 Access Denied', 'Admin authorization required.');
+        showAdminGateScreen();
+        return;
+      }
+
       const idx = adminEvents.findIndex(e => e.id === eventId);
       if (idx === -1) return;
 
@@ -473,6 +567,12 @@
     }
 
     async function deleteSubmission(eventId) {
+      if (sessionStorage.getItem('campuspulse_admin_auth') !== 'true') {
+        showToast('🔒 Access Denied', 'Admin authorization required.');
+        showAdminGateScreen();
+        return;
+      }
+
       if (!confirm("Are you sure you want to permanently delete this submission?")) return;
 
       adminEvents = adminEvents.filter(e => e.id !== eventId);
@@ -512,22 +612,6 @@
         toast.classList.remove('translate-y-0', 'opacity-100');
         toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
       }, 4000);
-    }
-
-    function toggleAdminAuth() {
-      document.getElementById('admin-auth-modal').style.display = 'flex';
-    }
-
-    function closeAdminAuthModal() {
-      document.getElementById('admin-auth-modal').style.display = 'none';
-    }
-
-    function handleAdminLogin(e) {
-      e.preventDefault();
-      isAdminVerified = true;
-      document.getElementById('admin-auth-text').textContent = 'Admin Verified';
-      closeAdminAuthModal();
-      showToast('✅ Authenticated as Admin', 'Welcome to CampusPulse Admin Publishing Portal.');
     }
 
     function escapeHTML(str) {
