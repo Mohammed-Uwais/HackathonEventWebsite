@@ -737,6 +737,34 @@ class App {
     const statusSelectContainer = document.getElementById('status-select-container');
     const dateFilterGroup = document.getElementById('date-filter-group');
     const legendBar = document.getElementById('legend-bar');
+    const categorySelect = document.getElementById('category-select');
+
+    if (categorySelect) {
+      categorySelect.value = ''; // Reset active category filter on tab switch
+      if (directory === 'projects') {
+        categorySelect.innerHTML = `
+          <option value="">All Categories</option>
+          <option value="Research Paper">Research Paper</option>
+          <option value="Capstone Project">Capstone Project</option>
+          <option value="Hardware Prototype">Hardware Prototype</option>
+          <option value="AI / ML Model">AI / ML Model</option>
+          <option value="Software Application">Software Application</option>
+          <option value="Open Source Tool">Open Source Tool</option>
+          <option value="Others">Others</option>
+        `;
+      } else {
+        categorySelect.innerHTML = `
+          <option value="">All Categories</option>
+          <option value="Hackathon">Hackathon</option>
+          <option value="Symposium">Symposium</option>
+          <option value="Workshop">Workshop</option>
+          <option value="Seminar">Seminar</option>
+          <option value="Quiz">Quiz</option>
+          <option value="Cultural">Cultural</option>
+          <option value="Others">Others</option>
+        `;
+      }
+    }
 
     if (directory === 'events') {
       if (titleEl) titleEl.textContent = 'Campus Events & Competitions Hub';
