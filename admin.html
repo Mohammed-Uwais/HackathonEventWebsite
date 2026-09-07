@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CampusPulse Admin Publishing Portal - Manage, accept, or decline event submissions before publishing to the campus discovery dashboard.">
+  <title>Admin Publishing Portal | CampusPulse</title>
+
+  <!-- Tailwind CSS CDN for Enterprise SaaS UI -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts: Plus Jakarta Sans & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Custom CSS & FontAwesome Icons -->
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- FIREBASE WEB SDK COMPAT MODULES FOR FIRESTORE REAL-TIME SYNC -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <!-- EMAILJS BROWSER SDK FOR AUTOMATIC BROADCAST NOTIFICATIONS -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
+
+  <!-- ADMIN TOP NAVBAR HEADER -->
+  <header class="bg-[#0f172a] text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-amber-500 text-slate-950 rounded-xl flex items-center justify-center font-black text-lg shadow-sm">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-base tracking-tight">CampusPulse</span>
+            <span class="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[10px] font-bold rounded border border-amber-500/30 uppercase tracking-wide">Admin Portal</span>
+          </div>
+          <p class="text-[11px] text-slate-400">Event & Project Moderation Publishing Console</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-semibold border border-slate-700 transition flex items-center gap-2">
+          <i class="fa-solid fa-globe text-blue-400"></i> Student Discovery Site
+        </a>
+        <button id="btn-admin-auth" onclick="toggleAdminAuth()" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-bold transition flex items-center gap-2 shadow">
+          <i class="fa-solid fa-user-shield"></i> <span id="admin-auth-text">Admin Verified</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN ADMIN WORKSPACE -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-8">
+    
+    <!-- PAGE TITLE BANNER -->
+    <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-6 text-white border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-extrabold tracking-tight flex items-center gap-2">
+          <i class="fa-solid fa-list-check text-amber-400"></i> Event Submission & Moderation
+        </h1>
+        <p class="text-xs text-slate-300 mt-1 max-w-2xl">
+          Review student and organizer event submissions. Accept submissions to publish them directly to the public discovery dashboard, or decline submissions to keep event details hidden.
+        </p>
+      </div>
+
+      <div class="flex items-center gap-2 bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-700 text-xs">
+        <i class="fa-solid fa-bolt text-amber-400"></i>
+        <span>Workflow: <strong>User Submits</strong> &rarr; <strong>Admin Reviews</strong> &rarr; <strong>Accept/Decline</strong></span>
+      </div>
+    </div>
+
+    <!-- METRICS CARDS -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Review</p>
+          <h3 class="text-2xl font-black text-amber-600 mt-1" id="stat-pending-count">0</h3>
+        </div>
+        <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl font-bold border border-amber-200">
+          <i class="fa-solid fa-hourglass-half"></i>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Approved & Live</p>
+          <h3 class="text-2xl font-black text-emerald-600 mt-1" id="stat-approved-count">0</h3>
+        </div>
+        <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl font-bold border border-emerald-200">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Declined Submissions</p>
+          <h3 class="text-2xl font-black text-rose-600 mt-1" id="stat-declined-count">0</h3>
+        </div>
+        <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center text-xl font-bold border border-rose-200">
+          <i class="fa-solid fa-circle-xmark"></i>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Submissions</p>
+          <h3 class="text-2xl font-black text-blue-600 mt-1" id="stat-total-count">0</h3>
+        </div>
+        <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl font-bold border border-blue-200">
+          <i class="fa-solid fa-layer-group"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB FILTER & CONTROLS BAR -->
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+        <button onclick="setAdminTab('pending')" id="tab-pending" class="px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-2 bg-amber-50 text-amber-700 border-amber-300 shadow-sm">
+          <i class="fa-solid fa-clock"></i> Pending Approvals (<span id="tab-pending-num">0</span>)
+        </button>
+        <button onclick="setAdminTab('approved')" id="tab-approved" class="px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-2 bg-white text-slate-600 border-slate-200 hover:bg-slate-100">
+          <i class="fa-solid fa-circle-check text-emerald-600"></i> Approved & Live (<span id="tab-approved-num">0</span>)
+        </button>
+        <button onclick="setAdminTab('declined')" id="tab-declined" class="px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-2 bg-white text-slate-600 border-slate-200 hover:bg-slate-100">
+          <i class="fa-solid fa-circle-xmark text-rose-600"></i> Declined (<span id="tab-declined-num">0</span>)
+        </button>
+        <button onclick="setAdminTab('all')" id="tab-all" class="px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-2 bg-white text-slate-600 border-slate-200 hover:bg-slate-100">
+          <i class="fa-solid fa-list"></i> All Submissions (<span id="tab-all-num">0</span>)
+        </button>
+      </div>
+
+      <div class="relative min-w-[240px]">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input type="text" id="admin-search-input" onkeyup="renderAdminList()" placeholder="Filter by title, email..." class="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-blue-600 transition">
+      </div>
+    </div>
+
+    <!-- SUBMISSIONS LIST CONTAINER -->
+    <div id="admin-submissions-grid" class="grid grid-cols-1 gap-4">
+      <!-- Dynamic Admin Cards rendered via JavaScript -->
+    </div>
+
+  </main>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="admin-toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 ease-out bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-2xl border border-slate-800 flex items-center gap-3 max-w-md pointer-events-none">
+    <div id="admin-toast-icon" class="text-amber-400 text-xl font-bold"><i class="fa-solid fa-bell"></i></div>
+    <div>
+      <h4 id="admin-toast-title" class="text-xs font-bold text-white">Notification Title</h4>
+      <p id="admin-toast-body" class="text-[11px] text-slate-300">Notification message detail.</p>
+    </div>
+  </div>
+
+  <!-- ADMIN AUTH MODAL -->
+  <div id="admin-auth-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-md w-full p-6 flex flex-col gap-5">
+      <div class="text-center flex flex-col items-center gap-2">
+        <div class="w-12 h-12 bg-amber-500 text-slate-950 rounded-xl flex items-center justify-center text-xl font-black shadow-md">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <h3 class="text-xl font-extrabold text-slate-900">Admin Authentication</h3>
+        <p class="text-xs text-slate-500">Enter Admin access credentials to verify moderation privileges.</p>
+      </div>
+
+      <form onsubmit="handleAdminLogin(event)" class="flex flex-col gap-4">
+        <div>
+          <label class="text-xs font-semibold text-slate-700">Admin Email</label>
+          <input type="email" id="admin-login-email" value="admin@campuspulse.edu" class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-amber-500 transition" required>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-slate-700">Passcode / Key</label>
+          <input type="password" id="admin-login-pass" value="admin123" class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-amber-500 transition" required>
+        </div>
+        
+        <button type="submit" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-sm rounded-lg shadow-md transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-key"></i> Verify & Access Admin Console
+        </button>
+
+        <button type="button" onclick="closeAdminAuthModal()" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg transition">
+          Continue as Guest Viewer
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADMIN MODERATION SCRIPT -->
+  <script>
+    // State Management
+    let adminEvents = [];
+    let activeTab = 'pending';
+    let isAdminVerified = true;
+    let db = null;
+
+    // Default Seed Fallback Events
+    const SEED_DATA = [
+      {
+        id: 'seed-1',
+        title: 'Hack-AI-Thon 2026: GenAI Innovations',
+        directory: 'events',
+        type: 'Hackathon',
+        shortDesc: '24-hour national student hackathon building high-impact LLM & GenAI apps.',
+        fullDesc: 'Join over 500+ student developers nationwide in constructing innovative generative AI solutions for real-world enterprise challenges.',
+        departments: ['CSE', 'IT', 'AIDS'],
+        rules: 'Standard campus event rules apply.',
+        eventStart: '2026-09-20T09:00',
+        organizerEmail: 'cse.head@campus.edu',
+        approvalStatus: 'approved',
+        posterUrl: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'seed-2',
+        title: 'Smart Campus Microgrid & Energy IoT Monitor',
+        directory: 'projects',
+        type: 'Project',
+        shortDesc: 'Real-time IoT sensor network tracking energy utilization across academic blocks.',
+        fullDesc: 'Energy analytics and IoT sensor network monitoring electricity consumption across academic blocks.',
+        departments: ['ECE', 'EEE', 'CSE'],
+        techStack: ['IoT', 'ESP32', 'Python'],
+        rules: 'Open-source under MIT License.',
+        organizerEmail: 'ece.innovator@licet.ac.in',
+        approvalStatus: 'approved',
+        posterUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80',
+        createdAt: new Date().toISOString()
+      }
+    ];
+
+    // Initialize Firebase and Data Stores
+    window.addEventListener('DOMContentLoaded', () => {
+      loadEventsFromStorage();
+      initFirebaseIfAvailable();
+      renderAdminList();
+    });
+
+    function loadEventsFromStorage() {
+      const stored = localStorage.getItem('campuspulse_events');
+      if (stored) {
+        try {
+          adminEvents = JSON.parse(stored);
+        } catch (e) {
+          adminEvents = [...SEED_DATA];
+        }
+      } else {
+        adminEvents = [...SEED_DATA];
+      }
+      updateMetrics();
+    }
+
+    function saveEventsToStorage() {
+      localStorage.setItem('campuspulse_events', JSON.stringify(adminEvents));
+      updateMetrics();
+    }
+
+    function initFirebaseIfAvailable() {
+      if (window.firebase && firebase.apps && firebase.apps.length > 0) {
+        db = firebase.firestore();
+        db.collection('events').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+          if (!snapshot.empty) {
+            const docs = [];
+            snapshot.forEach(doc => {
+              docs.push({ id: doc.id, ...doc.data() });
+            });
+            adminEvents = docs;
+            saveEventsToStorage();
+            renderAdminList();
+          }
+        });
+      }
+    }
+
+    function updateMetrics() {
+      const pendingCount = adminEvents.filter(e => e.approvalStatus === 'pending').length;
+      const approvedCount = adminEvents.filter(e => !e.approvalStatus || e.approvalStatus === 'approved').length;
+      const declinedCount = adminEvents.filter(e => e.approvalStatus === 'declined').length;
+      const totalCount = adminEvents.length;
+
+      document.getElementById('stat-pending-count').textContent = pendingCount;
+      document.getElementById('stat-approved-count').textContent = approvedCount;
+      document.getElementById('stat-declined-count').textContent = declinedCount;
+      document.getElementById('stat-total-count').textContent = totalCount;
+
+      document.getElementById('tab-pending-num').textContent = pendingCount;
+      document.getElementById('tab-approved-num').textContent = approvedCount;
+      document.getElementById('tab-declined-num').textContent = declinedCount;
+      document.getElementById('tab-all-num').textContent = totalCount;
+    }
+
+    function setAdminTab(tabName) {
+      activeTab = tabName;
+      const tabs = ['pending', 'approved', 'declined', 'all'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        if (t === tabName) {
+          btn.className = "px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-2 bg-amber-50 text-amber-700 border-amber-300 shadow-sm";
+        } else {
+          btn.className = "px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-2 bg-white text-slate-600 border-slate-200 hover:bg-slate-100";
+        }
+      });
+      renderAdminList();
+    }
+
+    function renderAdminList() {
+      const container = document.getElementById('admin-submissions-grid');
+      const searchQuery = (document.getElementById('admin-search-input')?.value || '').toLowerCase().trim();
+
+      let filtered = adminEvents.filter(e => {
+        const status = e.approvalStatus || 'approved';
+        if (activeTab === 'pending' && status !== 'pending') return false;
+        if (activeTab === 'approved' && status !== 'approved') return false;
+        if (activeTab === 'declined' && status !== 'declined') return false;
+
+        if (searchQuery) {
+          const matchTitle = (e.title || '').toLowerCase().includes(searchQuery);
+          const matchEmail = (e.organizerEmail || '').toLowerCase().includes(searchQuery);
+          const matchType = (e.type || '').toLowerCase().includes(searchQuery);
+          if (!matchTitle && !matchEmail && !matchType) return false;
+        }
+
+        return true;
+      });
+
+      updateMetrics();
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="bg-white border border-slate-200 rounded-2xl p-12 text-center flex flex-col items-center justify-center gap-3">
+            <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center text-2xl">
+              <i class="fa-regular fa-folder-open"></i>
+            </div>
+            <h3 class="text-base font-bold text-slate-800">No Submissions Found</h3>
+            <p class="text-xs text-slate-500 max-w-sm">No event or project submissions match the selected tab filter or search query.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(event => {
+        const status = event.approvalStatus || 'approved';
+        let statusBadgeHtml = '';
+        if (status === 'pending') {
+          statusBadgeHtml = `<span class="px-2.5 py-1 bg-amber-100 text-amber-800 border border-amber-300 rounded-full text-xs font-bold flex items-center gap-1.5"><i class="fa-solid fa-hourglass-half"></i> Pending Review</span>`;
+        } else if (status === 'approved') {
+          statusBadgeHtml = `<span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-full text-xs font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-check"></i> Approved & Published</span>`;
+        } else {
+          statusBadgeHtml = `<span class="px-2.5 py-1 bg-rose-100 text-rose-800 border border-rose-300 rounded-full text-xs font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-xmark"></i> Submission Declined</span>`;
+        }
+
+        const deptsHtml = (event.departments || ['All']).map(d => `<span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[11px] font-semibold">${escapeHTML(d)}</span>`).join(' ');
+        const posterImg = event.posterUrl || 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80';
+        const dateStr = event.eventStart ? new Date(event.eventStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBA';
+
+        return `
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition flex flex-col md:flex-row gap-5">
+            <div class="w-full md:w-48 h-36 rounded-xl overflow-hidden bg-slate-100 relative shrink-0">
+              <img src="${posterImg}" alt="${escapeHTML(event.title)}" class="w-full h-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80'">
+              <div class="absolute top-2 left-2 px-2 py-0.5 bg-slate-900/80 backdrop-blur-sm text-white rounded text-[10px] font-bold uppercase tracking-wider">
+                ${escapeHTML(event.directory || 'events')}
+              </div>
+            </div>
+
+            <div class="flex-1 flex flex-col justify-between gap-3">
+              <div>
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-xs font-bold">
+                      ${escapeHTML(event.type)}
+                    </span>
+                    ${statusBadgeHtml}
+                  </div>
+                  <span class="text-[11px] font-mono text-slate-400">
+                    <i class="fa-regular fa-clock"></i> ${new Date(event.createdAt || Date.now()).toLocaleDateString()}
+                  </span>
+                </div>
+
+                <h3 class="text-base font-extrabold text-slate-900 leading-snug">${escapeHTML(event.title)}</h3>
+                <p class="text-xs text-slate-600 mt-1 line-clamp-2">${escapeHTML(event.shortDesc)}</p>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs">
+                <div class="flex flex-wrap items-center gap-3 text-slate-500">
+                  <span><i class="fa-solid fa-user-gear text-slate-400"></i> ${escapeHTML(event.organizerEmail || 'Unknown')}</span>
+                  <span><i class="fa-regular fa-calendar text-blue-600"></i> ${dateStr}</span>
+                  <div class="flex items-center gap-1">${deptsHtml}</div>
+                </div>
+
+                <!-- ACTION BUTTONS WORKFLOW -->
+                <div class="flex items-center gap-2">
+                  ${status !== 'approved' ? `
+                    <button onclick="acceptSubmission('${escapeHTML(event.id)}')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow transition flex items-center gap-1.5">
+                      <i class="fa-solid fa-circle-check"></i> Accept & Publish
+                    </button>
+                  ` : ''}
+
+                  ${status !== 'declined' ? `
+                    <button onclick="declineSubmission('${escapeHTML(event.id)}')" class="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg font-bold text-xs transition flex items-center gap-1.5">
+                      <i class="fa-solid fa-circle-xmark"></i> Decline
+                    </button>
+                  ` : ''}
+
+                  <button onclick="deleteSubmission('${escapeHTML(event.id)}')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold transition" title="Delete Submission">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function acceptSubmission(eventId) {
+      const idx = adminEvents.findIndex(e => e.id === eventId);
+      if (idx === -1) return;
+
+      const event = adminEvents[idx];
+      event.approvalStatus = 'approved';
+      event.approvedAt = new Date().toISOString();
+
+      if (db) {
+        try {
+          await db.collection('events').doc(eventId).update({
+            approvalStatus: 'approved',
+            approvedAt: event.approvedAt
+          });
+        } catch (e) {
+          console.warn("Firestore accept update fallback:", e);
+        }
+      }
+
+      saveEventsToStorage();
+      renderAdminList();
+      showToast('🎉 Submission Accepted!', `"${event.title}" is now published and visible on the student dashboard.`);
+
+      // Optional Background Broadcast trigger
+      sendBroadcastEmailIfPossible(event);
+    }
+
+    async function declineSubmission(eventId) {
+      const idx = adminEvents.findIndex(e => e.id === eventId);
+      if (idx === -1) return;
+
+      const event = adminEvents[idx];
+      event.approvalStatus = 'declined';
+      event.declinedAt = new Date().toISOString();
+
+      if (db) {
+        try {
+          await db.collection('events').doc(eventId).update({
+            approvalStatus: 'declined',
+            declinedAt: event.declinedAt
+          });
+        } catch (e) {
+          console.warn("Firestore decline update fallback:", e);
+        }
+      }
+
+      saveEventsToStorage();
+      renderAdminList();
+      showToast('🚫 Submission Declined', `"${event.title}" status set to declined and hidden from public feed.`);
+    }
+
+    async function deleteSubmission(eventId) {
+      if (!confirm("Are you sure you want to permanently delete this submission?")) return;
+
+      adminEvents = adminEvents.filter(e => e.id !== eventId);
+      if (db) {
+        try {
+          await db.collection('events').doc(eventId).delete();
+        } catch (e) {}
+      }
+
+      saveEventsToStorage();
+      renderAdminList();
+      showToast('🗑️ Submission Deleted', 'Event submission removed from system.');
+    }
+
+    function sendBroadcastEmailIfPossible(event) {
+      if (window.emailjs) {
+        try {
+          emailjs.send('service_default', 'template_event_published', {
+            event_title: event.title,
+            event_type: event.type,
+            event_desc: event.shortDesc,
+            organizer_email: event.organizerEmail
+          }).then(() => console.log('Admin EmailJS broadcast sent.')).catch(() => {});
+        } catch (err) {}
+      }
+    }
+
+    function showToast(title, body) {
+      const toast = document.getElementById('admin-toast');
+      document.getElementById('admin-toast-title').textContent = title;
+      document.getElementById('admin-toast-body').textContent = body;
+
+      toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+      }, 4000);
+    }
+
+    function toggleAdminAuth() {
+      document.getElementById('admin-auth-modal').style.display = 'flex';
+    }
+
+    function closeAdminAuthModal() {
+      document.getElementById('admin-auth-modal').style.display = 'none';
+    }
+
+    function handleAdminLogin(e) {
+      e.preventDefault();
+      isAdminVerified = true;
+      document.getElementById('admin-auth-text').textContent = 'Admin Verified';
+      closeAdminAuthModal();
+      showToast('✅ Authenticated as Admin', 'Welcome to CampusPulse Admin Publishing Portal.');
+    }
+
+    function escapeHTML(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, function (m) {
+        return {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        }[m];
+      });
+    }
+  </script>
+</body>
+</html>

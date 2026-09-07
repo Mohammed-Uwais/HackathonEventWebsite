@@ -20,6 +20,7 @@ const SEED_EVENTS = [
     regLink: 'https://forms.google.com/example-hackathon',
     posterUrl: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80',
     organizerEmail: 'cse.head@campus.edu',
+    approvalStatus: 'approved',
     createdAt: new Date().toISOString()
   },
   {
@@ -37,6 +38,7 @@ const SEED_EVENTS = [
     regLink: 'https://forms.google.com/example-ece',
     posterUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80',
     organizerEmail: 'ece.admin@campus.edu',
+    approvalStatus: 'approved',
     createdAt: new Date().toISOString()
   },
   {
@@ -54,6 +56,7 @@ const SEED_EVENTS = [
     regLink: 'https://forms.google.com/example-codeblitz',
     posterUrl: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80',
     organizerEmail: 'it.society@campus.edu',
+    approvalStatus: 'approved',
     createdAt: new Date().toISOString()
   },
   /* DIRECTORY 2: STUDENT PROJECTS & RESEARCH INNOVATIONS SHOWCASE */
@@ -69,6 +72,7 @@ const SEED_EVENTS = [
     regLink: 'https://github.com/licet-projects/smart-energy-grid',
     posterUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80',
     organizerEmail: 'ece.innovator@licet.ac.in',
+    approvalStatus: 'approved',
     createdAt: new Date().toISOString()
   },
   {
@@ -83,6 +87,7 @@ const SEED_EVENTS = [
     regLink: 'https://github.com/licet-projects/ai-cancer-diagnostic',
     posterUrl: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80',
     organizerEmail: 'aids.research@licet.ac.in',
+    approvalStatus: 'approved',
     createdAt: new Date().toISOString()
   },
   {
@@ -97,6 +102,7 @@ const SEED_EVENTS = [
     regLink: 'https://github.com/licet-projects/autonomous-vision-drone',
     posterUrl: 'https://images.unsplash.com/photo-1508614589041-895b88991e3e?auto=format&fit=crop&w=800&q=80',
     organizerEmail: 'mech.robotics@licet.ac.in',
+    approvalStatus: 'approved',
     createdAt: new Date().toISOString()
   }
 ];
@@ -848,6 +854,11 @@ class App {
     let filtered = this.events.filter(event => {
       const statusInfo = this.evaluateEventStatus(event);
 
+      // 0. Admin Approval Filter: Only show approved events on the public dashboard (or legacy seeds with no status)
+      if (event.approvalStatus && event.approvalStatus !== 'approved') {
+        return false;
+      }
+
       // 1. Directory Filter (events vs projects vs history)
       if (this.activeDirectory === 'history') {
         const itemDir = event.directory || (event.type === 'Project' || event.type === 'Research' ? 'projects' : 'events');
@@ -1021,7 +1032,7 @@ class App {
             <div class="card-header-image">
               <img src="${posterImg}" alt="${this.escapeHTML(event.title)}" onerror="this.src='https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80'">
               <span class="card-type-badge">${this.escapeHTML(event.type)}</span>
-              <div style="position:absolute; top:0.75rem; right:0.75rem; display:flex; flex-direction:column; align-items:flex-end; gap:0.35rem;">
+              <div class="card-top-badges">
                 <span class="card-status-badge ${badgeClass}">${badgeLabel}</span>
                 ${recBadgeHtml}
               </div>
@@ -1062,7 +1073,7 @@ class App {
             <div class="card-header-image">
               <img src="${posterImg}" alt="${this.escapeHTML(event.title)}" onerror="this.src='https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80'">
               <span class="card-type-badge">${this.escapeHTML(event.type)}</span>
-              <div style="position:absolute; top:0.75rem; right:0.75rem; display:flex; flex-direction:column; align-items:flex-end; gap:0.35rem;">
+              <div class="card-top-badges">
                 <span class="card-status-badge ${statusInfo.class}">${statusInfo.label}</span>
                 ${recBadgeHtml}
               </div>
@@ -1195,6 +1206,7 @@ class App {
       regLink,
       posterUrl,
       organizerEmail: this.currentUser.email,
+      approvalStatus: 'pending',
       createdAt: new Date().toISOString()
     };
 
@@ -1217,11 +1229,60 @@ class App {
     this.switchDirectory(directory);
     this.closeModal('publish-modal');
     this.triggerToastNotification(
-      directory === 'projects' ? '💡 New Project / Paper Published!' : '🎉 New Event Published!',
-      `${this.escapeHTML(newEvent.title)} added to Directory.`
+      '⌛ Submitted for Admin Approval!',
+      `"${this.escapeHTML(newEvent.title)}" has been submitted and is pending Admin approval. Once accepted, it will appear on the discovery dashboard.`
     );
-    this.sendMobilePushNotification(newEvent);
-    this.broadcastEventToRegisteredUsers(newEvent);
+  }
+
+  // --- ADMIN APPROVAL & MODERATION WORKFLOW ---
+  async approveEvent(eventId) {
+    const targetIndex = this.events.findIndex(e => e.id === eventId);
+    if (targetIndex === -1) return;
+    const event = this.events[targetIndex];
+
+    event.approvalStatus = 'approved';
+    event.approvedAt = new Date().toISOString();
+
+    if (this.db) {
+      try {
+        await this.db.collection('events').doc(eventId).update({
+          approvalStatus: 'approved',
+          approvedAt: event.approvedAt
+        });
+      } catch (err) {
+        console.warn("Firestore approve update error:", err);
+      }
+    }
+
+    this.saveEventsToStorage();
+    this.triggerToastNotification('🎉 Event Approved & Published!', `"${this.escapeHTML(event.title)}" is now live on the campus discovery dashboard.`);
+    this.broadcastEventToRegisteredUsers(event);
+    this.sendMobilePushNotification(event);
+    this.renderEvents();
+  }
+
+  async declineEvent(eventId) {
+    const targetIndex = this.events.findIndex(e => e.id === eventId);
+    if (targetIndex === -1) return;
+    const event = this.events[targetIndex];
+
+    event.approvalStatus = 'declined';
+    event.declinedAt = new Date().toISOString();
+
+    if (this.db) {
+      try {
+        await this.db.collection('events').doc(eventId).update({
+          approvalStatus: 'declined',
+          declinedAt: event.declinedAt
+        });
+      } catch (err) {
+        console.warn("Firestore decline update error:", err);
+      }
+    }
+
+    this.saveEventsToStorage();
+    this.triggerToastNotification('🚫 Event Submission Declined', `"${this.escapeHTML(event.title)}" was declined and will not appear in the discovery dashboard.`);
+    this.renderEvents();
   }
 
   // --- MOBILE PUSH NOTIFICATION SYSTEM (LOGGED-IN USERS & CLOSED BROWSER FCM) ---
