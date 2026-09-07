@@ -1604,18 +1604,6 @@ Output pure JSON with no markdown formatting or commentary.`;
           posterUrl: this.aiPosterBase64 || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80'
         };
       }
-          shortDesc: rawText ? rawText.substring(0, 100) + '...' : 'Parsed event details from uploaded poster flyer.',
-          fullDesc: rawText || 'Event flyer extracted via Groq Vision AI.',
-          departments: ['CSE', 'ECE'],
-          rules: 'Bring valid college ID card.',
-          regStart: new Date().toISOString().slice(0, 16),
-          regEnd: new Date(Date.now() + 86400000 * 5).toISOString().slice(0, 16),
-          eventStart: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 16),
-          eventEnd: new Date(Date.now() + 86400000 * 7 + 14400000).toISOString().slice(0, 16),
-          regLink: 'https://forms.google.com/sample',
-          posterUrl: this.aiPosterBase64 || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80'
-        };
-      }
 
       document.getElementById('pub-title').value = parsed.title || '';
       document.getElementById('pub-type').value = parsed.type || 'Symposium';
